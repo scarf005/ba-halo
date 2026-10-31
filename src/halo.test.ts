@@ -25,6 +25,19 @@ describe("projector", () => {
   test("orthographic mode ignores depth", () => close(projector({ ...IDENTITY, z: 3 })(1, 1), [1, -1]))
 })
 
+describe("project", () => {
+  const wide = [[[-3, 0, 3, 0, 3, 1, -3, 1]]]
+
+  test("drops rings entirely behind the camera", () =>
+    expect(project(wide, { ...IDENTITY, perspective: 1, z: 2 })).toEqual([[]]))
+
+  test("clips rings that cross the camera plane to finite points", () => {
+    const [[ring]] = project(wide, { ...IDENTITY, perspective: 2, rotateY: 90 })
+    expect(ring.length).toBeGreaterThanOrEqual(6)
+    expect(ring.every((v) => Number.isFinite(v) && Math.abs(v) < 100)).toBe(true)
+  })
+})
+
 describe("toSvg", () => {
   const square = [[[0, 0, 2, 0, 2, 1, 0, 1]]]
 

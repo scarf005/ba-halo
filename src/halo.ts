@@ -47,32 +47,60 @@ export const IDENTITY: Transform = {
 
 const rad = (deg: number) => (deg * Math.PI) / 180
 
-/** Scale, skew, rotate Z/Y/X, translate, then project; returns screen points with y pointing down. */
-export const projector = (t: Transform) => {
+/** Scale, skew, rotate Z/Y/X, then translate; returns a 3D point with y pointing up. */
+const placer = (t: Transform) => {
   const [cx, sx, cy, sy, cz, sz] = [t.rotateX, t.rotateY, t.rotateZ].flatMap((a) => [
     Math.cos(rad(a)),
     Math.sin(rad(a)),
   ])
   const [kx, ky] = [Math.tan(rad(t.skewX)), Math.tan(rad(t.skewY))]
-  return (px: number, py: number): [number, number] => {
+  return (px: number, py: number): [number, number, number] => {
     const [ax, ay] = [px * t.scaleX, py * t.scaleY]
     const [bx, by] = [ax + kx * ay, ay + ky * ax]
     const [rx, ry] = [bx * cz - by * sz, bx * sz + by * cz]
     const [ux, uz] = [rx * cy, -rx * sy]
     const [vy, vz] = [ry * cx - uz * sx, ry * sx + uz * cx]
-    const [x, y, z] = [ux + t.x, vy + t.y, vz + t.z]
-    const f = t.perspective > 0 ? t.perspective / Math.max(t.perspective - z, 1e-3) : 1
-    return [x * f, -y * f]
+    return [ux + t.x, vy + t.y, vz + t.z]
   }
 }
 
+/** Points must stay this far in front of the camera, which limits perspective magnification to perspective / NEAR. */
+const NEAR = 0.05
+
+const toScreen = (t: Transform, [x, y, z]: number[]): [number, number] => {
+  const f = t.perspective > 0 ? t.perspective / (t.perspective - z) : 1
+  return [x * f, -y * f]
+}
+
+/** Placed and projected point; returns screen points with y pointing down. */
+export const projector = (t: Transform) => {
+  const place = placer(t)
+  return (px: number, py: number) => toScreen(t, place(px, py))
+}
+
+/** Sutherland-Hodgman clip of a closed ring against the plane z = limit, keeping the side toward -z. */
+const clipNear = (ring: number[][], limit: number) => {
+  const out: number[][] = []
+  ring.forEach((p, i) => {
+    const q = ring[(i + 1) % ring.length]
+    const [pIn, qIn] = [p[2] <= limit, q[2] <= limit]
+    if (pIn) out.push(p)
+    if (pIn !== qIn) {
+      const k = (limit - p[2]) / (q[2] - p[2])
+      out.push(p.map((v, j) => v + (q[j] - v) * k))
+    }
+  })
+  return out
+}
+
 export const project = (polygons: number[][][], t: Transform) => {
-  const p = projector(t)
+  const place = placer(t)
   return polygons.map((rings) =>
-    rings.map((ring) => {
-      const out: number[] = []
-      for (let i = 0; i < ring.length; i += 2) out.push(...p(ring[i], ring[i + 1]))
-      return out
+    rings.flatMap((ring) => {
+      let points: number[][] = []
+      for (let i = 0; i < ring.length; i += 2) points.push(place(ring[i], ring[i + 1]))
+      if (t.perspective > 0) points = clipNear(points, t.perspective - NEAR)
+      return points.length < 3 ? [] : [points.flatMap((p) => toScreen(t, p))]
     }),
   )
 }
