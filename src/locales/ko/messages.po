@@ -7,11 +7,11 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: ko\n"
 
-#: src/App.tsx:187
+#: src/App.tsx:196
 msgid "All"
 msgstr "전체"
 
-#: src/App.tsx:243
+#: src/App.tsx:252
 msgid "Color"
 msgstr "색상"
 
@@ -23,104 +23,108 @@ msgstr "복사했습니다"
 msgid "Copy failed"
 msgstr "복사하지 못했습니다"
 
-#: src/App.tsx:284
+#: src/App.tsx:296
 msgid "Copy PNG"
 msgstr "PNG 복사"
 
-#: src/App.tsx:283
+#: src/App.tsx:295
 msgid "Copy SVG"
 msgstr "SVG 복사"
 
-#: src/App.tsx:286
+#: src/App.tsx:298
 msgid "Download PNG"
 msgstr "PNG 저장"
 
-#: src/App.tsx:285
+#: src/App.tsx:297
 msgid "Download SVG"
 msgstr "SVG 저장"
 
-#: src/App.tsx:264
+#: src/App.tsx:273
 msgid "Glow color"
 msgstr "발광 색상"
 
-#: src/App.tsx:248
+#: src/App.tsx:257
 msgid "Glow radius"
 msgstr "발광 범위"
 
-#: src/App.tsx:256
+#: src/App.tsx:265
 msgid "Glow strength"
 msgstr "발광 세기"
 
-#: src/App.tsx:182
+#: src/App.tsx:191
 msgid "Language"
 msgstr "언어"
 
-#: src/App.tsx:189
+#: src/App.tsx:198
 msgid "No school"
 msgstr "학교 없음"
 
-#: src/App.tsx:168
+#: src/App.tsx:177
 msgid "Perspective"
 msgstr "원근"
 
-#: src/App.tsx:161
+#: src/App.tsx:170
 msgid "Position X"
 msgstr "위치 X"
 
-#: src/App.tsx:162
+#: src/App.tsx:171
 msgid "Position Y"
 msgstr "위치 Y"
 
-#: src/App.tsx:163
+#: src/App.tsx:172
 msgid "Position Z"
 msgstr "위치 Z"
 
-#: src/App.tsx:245
-#: src/App.tsx:266
+#: src/App.tsx:254
+#: src/App.tsx:275
 msgid "Reset color"
 msgstr "색상 초기화"
 
-#: src/App.tsx:241
+#: src/App.tsx:250
 msgid "Reset transform"
 msgstr "변형 초기화"
 
-#: src/App.tsx:158
+#: src/App.tsx:167
 msgid "Rotate X"
 msgstr "회전 X"
 
-#: src/App.tsx:159
+#: src/App.tsx:168
 msgid "Rotate Y"
 msgstr "회전 Y"
 
-#: src/App.tsx:160
+#: src/App.tsx:169
 msgid "Rotate Z"
 msgstr "회전 Z"
 
-#: src/App.tsx:164
+#: src/App.tsx:139
+msgid "Save failed"
+msgstr "저장하지 못했습니다"
+
+#: src/App.tsx:173
 msgid "Scale X"
 msgstr "크기 X"
 
-#: src/App.tsx:165
+#: src/App.tsx:174
 msgid "Scale Y"
 msgstr "크기 Y"
 
-#: src/App.tsx:177
-#: src/App.tsx:178
+#: src/App.tsx:186
+#: src/App.tsx:187
 msgid "Search"
 msgstr "검색"
 
-#: src/App.tsx:269
+#: src/App.tsx:278
 msgid "Size (px)"
 msgstr "크기 (px)"
 
-#: src/App.tsx:166
+#: src/App.tsx:175
 msgid "Skew X"
 msgstr "기울이기 X"
 
-#: src/App.tsx:167
+#: src/App.tsx:176
 msgid "Skew Y"
 msgstr "기울이기 Y"
 
-#: src/App.tsx:280
+#: src/App.tsx:292
 msgid "Trim to halo"
 msgstr "헤일로에 맞춰 자르기"

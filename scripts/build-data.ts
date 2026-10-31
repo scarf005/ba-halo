@@ -44,6 +44,10 @@ const fullName = (s: Student) =>
     .join(" ")
 
 const halos = await getJson<Record<string, { color: string; wkt: string }>>(HALOS)
+// Colors go into SVG markup unescaped.
+for (const [key, { color }] of Object.entries(halos)) {
+  if (!/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(color)) throw new Error(`${key}: invalid color ${color}`)
+}
 const students = await perLang(async (db) =>
   Object.values(await getJson<Record<string, Student>>(SCHALE(db, "students"))),
 )
@@ -73,14 +77,14 @@ const enemyNames = (key: string): Record<Lang, Names> | undefined => {
   if (!enemy) return
   return Object.fromEntries(
     Object.keys(LANGS).map((lang) => {
-      const name = enemies[lang as Lang][enemy.Id].Name.replace(/ Type.*$/, "")
+      const name = (enemies[lang as Lang][enemy.Id] ?? enemy).Name.replace(/ Type.*$/, "")
       return [lang, { name, full: name }]
     }),
   ) as Record<Lang, Names>
 }
 
 const SCENARIO_LANGS: Record<Lang, "EN" | "JP" | "KR"> = { en: "EN", ja: "JP", ko: "KR" }
-const npc = (key: string) => scenarioNames.find((n) => n.NameEN === key)
+const npc = (key: string) => scenarioNames.find((n) => n.NameEN === key && n.NameJP && n.NameKR)
 const npcNames = (n: ScenarioName) =>
   Object.fromEntries(
     Object.entries(SCENARIO_LANGS).map(([lang, l]) => [lang, { name: n[`Name${l}`], full: n[`Name${l}`] }]),

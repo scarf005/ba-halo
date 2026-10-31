@@ -133,7 +133,16 @@ export const App = () => {
   const copySvg = () => copy(() => navigator.clipboard.writeText(svg()))
   const copyPng = () => copy(() => navigator.clipboard.write([new ClipboardItem({ "image/png": svgToPng(svg()) })]))
   const downloadSvg = () => download(new Blob([svg()], { type: "image/svg+xml" }), `${fileName()}.svg`)
-  const downloadPng = () => svgToPng(svg()).then((b) => download(b, `${fileName()}.png`))
+  const downloadPng = () =>
+    svgToPng(svg()).then(
+      (b) => download(b, `${fileName()}.png`),
+      () => flash(t`Save failed`),
+    )
+  /** Nothing to export before data loads, or when scaling or clipping leaves no area. */
+  const exportable = () => {
+    const box = bounds(projected())
+    return Number.isFinite(box.width) && Math.max(box.width, box.height) > 0
+  }
 
   let drag: { x: number; y: number } | undefined
   const endDrag = () => {
@@ -272,7 +281,10 @@ export const App = () => {
             min={16}
             max={8192}
             value={size()}
-            onChange={(e) => setSize(Math.min(8192, Math.max(16, e.currentTarget.valueAsNumber || 1024)))}
+            onChange={(e) => {
+              setSize(Math.min(8192, Math.max(16, e.currentTarget.valueAsNumber || 1024)))
+              e.currentTarget.value = String(size())
+            }}
           />
         </label>
         <label class="check">
@@ -280,10 +292,10 @@ export const App = () => {
           <span>{t`Trim to halo`}</span>
         </label>
         <div class="actions">
-          <button type="button" onClick={copySvg}>{t`Copy SVG`}</button>
-          <button type="button" onClick={copyPng}>{t`Copy PNG`}</button>
-          <button type="button" onClick={downloadSvg}>{t`Download SVG`}</button>
-          <button type="button" onClick={downloadPng}>{t`Download PNG`}</button>
+          <button type="button" disabled={!exportable()} onClick={copySvg}>{t`Copy SVG`}</button>
+          <button type="button" disabled={!exportable()} onClick={copyPng}>{t`Copy PNG`}</button>
+          <button type="button" disabled={!exportable()} onClick={downloadSvg}>{t`Download SVG`}</button>
+          <button type="button" disabled={!exportable()} onClick={downloadPng}>{t`Download PNG`}</button>
         </div>
         <output aria-live="polite">{status()}</output>
       </section>
