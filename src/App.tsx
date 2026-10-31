@@ -4,7 +4,9 @@ import { createStore } from "solid-js/store"
 import {
   bounds,
   FRAME,
+  type Glow,
   type Halo,
+  type HaloData,
   IDENTITY,
   type Locale,
   matches,
@@ -20,7 +22,7 @@ const bare = (s: string) => s.replace(/\s/g, "")
 const title = (n: { name: string; full: string }) =>
   bare(n.full).includes(bare(n.name)) ? n.full : `${n.name} (${n.full})`
 
-const loadHalos = async (): Promise<Halo[]> => (await fetch("./data/halos.json")).json()
+const loadData = async (): Promise<HaloData> => (await fetch("./data/halos.json")).json()
 
 const download = (blob: Blob, name: string) => {
   const a = document.createElement("a")
@@ -62,26 +64,61 @@ const Thumb = (props: { halo: Halo }) => {
   )
 }
 
+const Slider = (props: {
+  label: string
+  min: number
+  max: number
+  step: number
+  value: number
+  onInput: (value: number) => void
+}) => (
+  <label class="slider">
+    <span>{props.label}</span>
+    <input
+      type="range"
+      min={props.min}
+      max={props.max}
+      step={props.step}
+      value={props.value}
+      onInput={(e) => props.onInput(e.currentTarget.valueAsNumber)}
+    />
+    <input
+      type="number"
+      aria-label={props.label}
+      step={props.step}
+      value={Math.round(props.value * 100) / 100}
+      onChange={(e) => props.onInput(e.currentTarget.valueAsNumber || 0)}
+    />
+  </label>
+)
+
 export const App = () => {
   const { t, i18n } = useLingui()
   const locale = () => i18n().locale as Locale
-  const [halos] = createResource(loadHalos)
+  const [data] = createResource(loadData)
   const [query, setQuery] = createSignal("")
+  /** undefined shows every halo; null shows halos without a school. */
+  const [school, setSchool] = createSignal<string | null>()
   const [selected, setSelected] = createSignal<Halo>()
   const [transform, setTransform] = createStore<Transform>({ ...IDENTITY, perspective: 8 })
   const [color, setColor] = createSignal<string>()
+  const [glow, setGlow] = createStore<Omit<Glow, "color"> & { color?: string }>({ radius: 0, strength: 1.5 })
   const [size, setSize] = createSignal(1024)
   const [trim, setTrim] = createSignal(true)
   const [status, setStatus] = createSignal("")
 
-  const filtered = createMemo(() => (halos() ?? []).filter((h) => matches(h, query())))
+  const filtered = createMemo(() =>
+    (data()?.halos ?? []).filter((h) => (school() === undefined || h.school === school()) && matches(h, query())),
+  )
   const current = () => selected() ?? filtered()[0]
   const fill = () => color() ?? current()?.color ?? "#000"
   const projected = createMemo(() => {
     const halo = current()
     return halo ? project(halo.polygons, { ...transform }) : []
   })
-  const svg = () => toSvg({ polygons: projected(), color: fill(), size: size(), box: trim() ? undefined : FRAME })
+  const glowSpec = (): Glow => ({ ...glow, color: glow.color ?? fill() })
+  const svg = () =>
+    toSvg({ polygons: projected(), color: fill(), size: size(), box: trim() ? undefined : FRAME, glow: glowSpec() })
   const fileName = () => `halo-${current()?.key.toLowerCase().replace(/\W+/g, "-")}`
 
   const flash = (message: string) => {
@@ -110,6 +147,12 @@ export const App = () => {
     })
     drag = { x: e.clientX, y: e.clientY }
   }
+
+  const schoolChip = (id: string | null | undefined, label: string) => (
+    <button type="button" aria-pressed={school() === id} onClick={() => setSchool(id)}>
+      {label}
+    </button>
+  )
 
   const sliders = (): { key: keyof Transform; label: string; min: number; max: number; step: number }[] => [
     { key: "rotateX", label: t`Rotate X`, min: -180, max: 180, step: 1 },
@@ -140,6 +183,11 @@ export const App = () => {
             <For each={Object.entries(LOCALES)}>{([code, name]) => <option value={code}>{name}</option>}</For>
           </select>
         </div>
+        <div class="schools">
+          {schoolChip(undefined, t`All`)}
+          <For each={Object.entries(data()?.schools ?? {})}>{([id, names]) => schoolChip(id, names[locale()])}</For>
+          {schoolChip(null, t`No school`)}
+        </div>
         <ul class="halo-list">
           <For each={filtered()}>
             {(halo) => (
@@ -166,10 +214,9 @@ export const App = () => {
           {(halo) => (
             <>
               <h1>{title(halo().names[locale()])}</h1>
-              <svg
+              <div
                 class="preview"
-                viewBox={`${FRAME.x} ${FRAME.y} ${FRAME.width} ${FRAME.height}`}
-                fill={fill()}
+                innerHTML={toSvg({ polygons: projected(), color: fill(), size: 1000, box: FRAME, glow: glowSpec() })}
                 onPointerDown={(e) => {
                   e.currentTarget.setPointerCapture(e.pointerId)
                   drag = { x: e.clientX, y: e.clientY }
@@ -179,35 +226,14 @@ export const App = () => {
                 onPointerCancel={endDrag}
                 role="img"
                 aria-label={halo().names[locale()].full}
-              >
-                <For each={projected()}>{(rings) => <path fill-rule="evenodd" d={pathData(rings)} />}</For>
-              </svg>
+              />
             </>
           )}
         </Show>
       </main>
       <section class="controls">
         <For each={sliders()}>
-          {(s) => (
-            <label class="slider">
-              <span>{s.label}</span>
-              <input
-                type="range"
-                min={s.min}
-                max={s.max}
-                step={s.step}
-                value={transform[s.key]}
-                onInput={(e) => setTransform(s.key, e.currentTarget.valueAsNumber)}
-              />
-              <input
-                type="number"
-                aria-label={s.label}
-                step={s.step}
-                value={Math.round(transform[s.key] * 100) / 100}
-                onChange={(e) => setTransform(s.key, e.currentTarget.valueAsNumber || 0)}
-              />
-            </label>
-          )}
+          {(s) => <Slider {...s} value={transform[s.key]} onInput={(v) => setTransform(s.key, v)} />}
         </For>
         <button
           type="button"
@@ -217,6 +243,27 @@ export const App = () => {
           <span>{t`Color`}</span>
           <input type="color" value={fill()} onInput={(e) => setColor(e.currentTarget.value)} />
           <button type="button" onClick={() => setColor()}>{t`Reset color`}</button>
+        </label>
+        <Slider
+          label={t`Glow radius`}
+          min={0}
+          max={0.5}
+          step={0.01}
+          value={glow.radius}
+          onInput={(v) => setGlow("radius", v)}
+        />
+        <Slider
+          label={t`Glow strength`}
+          min={0}
+          max={5}
+          step={0.1}
+          value={glow.strength}
+          onInput={(v) => setGlow("strength", v)}
+        />
+        <label class="slider">
+          <span>{t`Glow color`}</span>
+          <input type="color" value={glowSpec().color} onInput={(e) => setGlow("color", e.currentTarget.value)} />
+          <button type="button" onClick={() => setGlow("color", undefined)}>{t`Reset color`}</button>
         </label>
         <label class="slider">
           <span>{t`Size (px)`}</span>

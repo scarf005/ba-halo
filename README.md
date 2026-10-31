@@ -1,6 +1,7 @@
 # BA Halo
 
-Search Blue Archive halos, rotate and move them in 3D, and copy or save them as SVG or transparent PNG.
+Search Blue Archive halos by name, school, or club, filter them by school, rotate and move them in 3D, add a glow, and
+copy or save them as SVG or transparent PNG.
 The UI is in English, Japanese, and Korean.
 
 ## Commands
@@ -13,4 +14,5 @@ The UI is in English, Japanese, and Korean.
 ## Data
 
 - Halo outlines and colors: [Halo Forge](https://github.com/dobrosketchkun/halo_forge) `halo/data/ba_halos.json`.
-- Student names in English, Japanese, and Korean: [SchaleDB](https://schaledb.com).
+- Student, boss, school, and club names in English, Japanese, and Korean: [SchaleDB](https://schaledb.com).
+- NPC names and affiliations: [ba-data](https://github.com/electricgoat/ba-data) `Excel/ScenarioCharacterNameExcelTable.json`.

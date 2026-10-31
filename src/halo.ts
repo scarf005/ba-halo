@@ -3,11 +3,18 @@ export type Locale = "en" | "ja" | "ko"
 export type Halo = {
   key: string
   color: string
+  /** School id, a key of `HaloData.schools`. */
   school: string | null
   names: Record<Locale, { name: string; full: string }>
+  /** School and club names in every locale, for search. */
+  tags: string[]
   /** Polygons of rings; each ring is a flat [x, y, x, y, ...] list with y pointing up. */
   polygons: number[][][]
 }
+
+export type HaloData = { schools: Record<string, Record<Locale, string>>; halos: Halo[] }
+
+export type Glow = { radius: number; strength: number; color: string }
 
 export type Transform = {
   rotateX: number
@@ -98,14 +105,34 @@ export const bounds = (polygons: number[][][]): Box => {
 
 export const FRAME: Box = { x: -2.5, y: -2.5, width: 5, height: 5 }
 
-/** Standalone SVG whose longest side is `size` pixels; `box` defaults to the projected halo's bounds. */
-export const toSvg = (o: { polygons: number[][][]; color: string; size: number; box?: Box }) => {
-  const box = o.box ?? bounds(o.polygons)
+const grow = (b: Box, by: number): Box => ({
+  x: b.x - by,
+  y: b.y - by,
+  width: b.width + 2 * by,
+  height: b.height + 2 * by,
+})
+
+/** Blurred copy of the halo's alpha, tinted with the glow color and amplified by `strength`, drawn under the halo. */
+const glowFilter = (g: Glow, box: Box) =>
+  `<filter id="glow" filterUnits="userSpaceOnUse" x="${num(box.x)}" y="${num(box.y)}" width="${num(box.width)}" height="${num(box.height)}">` +
+  `<feGaussianBlur in="SourceAlpha" stdDeviation="${num(g.radius)}" result="blur"/>` +
+  `<feFlood flood-color="${g.color}"/><feComposite in2="blur" operator="in"/>` +
+  `<feComponentTransfer><feFuncA type="linear" slope="${num(g.strength)}"/></feComponentTransfer>` +
+  '<feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>'
+
+/**
+ * Standalone SVG whose longest side is `size` pixels; `box` defaults to the projected halo's bounds, grown to fit the
+ * glow.
+ */
+export const toSvg = (o: { polygons: number[][][]; color: string; size: number; box?: Box; glow?: Glow }) => {
+  const glow = o.glow && o.glow.radius > 0 && o.glow.strength > 0 ? o.glow : undefined
+  const box = o.box ?? grow(bounds(o.polygons), glow ? glow.radius * 3 : 0)
   const scale = o.size / Math.max(box.width, box.height)
   const [w, h] = [Math.max(1, Math.round(box.width * scale)), Math.max(1, Math.round(box.height * scale))]
   const paths = o.polygons.map((rings) => `<path fill-rule="evenodd" d="${pathData(rings)}"/>`).join("")
   const viewBox = [box.x, box.y, box.width, box.height].map(num).join(" ")
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${viewBox}"><g fill="${o.color}">${paths}</g></svg>`
+  const [defs, filter] = glow ? [`<defs>${glowFilter(glow, box)}</defs>`, ' filter="url(#glow)"'] : ["", ""]
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${viewBox}">${defs}<g fill="${o.color}"${filter}>${paths}</g></svg>`
 }
 
 const fold = (s: string) =>
@@ -117,6 +144,6 @@ const fold = (s: string) =>
 export const matches = (halo: Halo, query: string) => {
   const q = fold(query)
   if (!q) return true
-  const terms = [halo.key, halo.school ?? "", ...Object.values(halo.names).flatMap((n) => [n.name, n.full])]
+  const terms = [halo.key, ...halo.tags, ...Object.values(halo.names).flatMap((n) => [n.name, n.full])]
   return terms.some((term) => fold(term).includes(q))
 }

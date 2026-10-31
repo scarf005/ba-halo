@@ -7,99 +7,120 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: ja\n"
 
-#: src/App.tsx:200
+#: src/App.tsx:187
+msgid "All"
+msgstr "すべて"
+
+#: src/App.tsx:243
 msgid "Color"
 msgstr "色"
 
-#: src/App.tsx:78
+#: src/App.tsx:130
 msgid "Copied"
 msgstr "コピーしました"
 
-#: src/App.tsx:79
+#: src/App.tsx:131
 msgid "Copy failed"
 msgstr "コピーに失敗しました"
 
-#: src/App.tsx:220
+#: src/App.tsx:284
 msgid "Copy PNG"
 msgstr "PNGをコピー"
 
-#: src/App.tsx:219
+#: src/App.tsx:283
 msgid "Copy SVG"
 msgstr "SVGをコピー"
 
-#: src/App.tsx:222
+#: src/App.tsx:286
 msgid "Download PNG"
 msgstr "PNGを保存"
 
-#: src/App.tsx:221
+#: src/App.tsx:285
 msgid "Download SVG"
 msgstr "SVGを保存"
 
-#: src/App.tsx:122
+#: src/App.tsx:264
+msgid "Glow color"
+msgstr "発光の色"
+
+#: src/App.tsx:248
+msgid "Glow radius"
+msgstr "発光の広さ"
+
+#: src/App.tsx:256
+msgid "Glow strength"
+msgstr "発光の強さ"
+
+#: src/App.tsx:182
 msgid "Language"
 msgstr "言語"
 
-#: src/App.tsx:107
+#: src/App.tsx:189
+msgid "No school"
+msgstr "学園なし"
+
+#: src/App.tsx:168
 msgid "Perspective"
 msgstr "遠近"
 
-#: src/App.tsx:100
+#: src/App.tsx:161
 msgid "Position X"
 msgstr "位置 X"
 
-#: src/App.tsx:101
+#: src/App.tsx:162
 msgid "Position Y"
 msgstr "位置 Y"
 
-#: src/App.tsx:102
+#: src/App.tsx:163
 msgid "Position Z"
 msgstr "位置 Z"
 
-#: src/App.tsx:202
+#: src/App.tsx:245
+#: src/App.tsx:266
 msgid "Reset color"
 msgstr "色をリセット"
 
-#: src/App.tsx:198
+#: src/App.tsx:241
 msgid "Reset transform"
 msgstr "変形をリセット"
 
-#: src/App.tsx:97
+#: src/App.tsx:158
 msgid "Rotate X"
 msgstr "回転 X"
 
-#: src/App.tsx:98
+#: src/App.tsx:159
 msgid "Rotate Y"
 msgstr "回転 Y"
 
-#: src/App.tsx:99
+#: src/App.tsx:160
 msgid "Rotate Z"
 msgstr "回転 Z"
 
-#: src/App.tsx:103
+#: src/App.tsx:164
 msgid "Scale X"
 msgstr "拡大 X"
 
-#: src/App.tsx:104
+#: src/App.tsx:165
 msgid "Scale Y"
 msgstr "拡大 Y"
 
-#: src/App.tsx:116
-#: src/App.tsx:117
+#: src/App.tsx:177
+#: src/App.tsx:178
 msgid "Search"
 msgstr "検索"
 
-#: src/App.tsx:205
+#: src/App.tsx:269
 msgid "Size (px)"
 msgstr "サイズ (px)"
 
-#: src/App.tsx:105
+#: src/App.tsx:166
 msgid "Skew X"
 msgstr "傾斜 X"
 
-#: src/App.tsx:106
+#: src/App.tsx:167
 msgid "Skew Y"
 msgstr "傾斜 Y"
 
-#: src/App.tsx:216
+#: src/App.tsx:280
 msgid "Trim to halo"
 msgstr "ヘイローに合わせて切り抜く"
