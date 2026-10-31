@@ -1,0 +1,105 @@
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2026-10-31 21:50+0900\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: @lingui/cli\n"
+"Language: ko\n"
+
+#: src/App.tsx:200
+msgid "Color"
+msgstr "색상"
+
+#: src/App.tsx:78
+msgid "Copied"
+msgstr "복사했습니다"
+
+#: src/App.tsx:79
+msgid "Copy failed"
+msgstr "복사하지 못했습니다"
+
+#: src/App.tsx:220
+msgid "Copy PNG"
+msgstr "PNG 복사"
+
+#: src/App.tsx:219
+msgid "Copy SVG"
+msgstr "SVG 복사"
+
+#: src/App.tsx:222
+msgid "Download PNG"
+msgstr "PNG 저장"
+
+#: src/App.tsx:221
+msgid "Download SVG"
+msgstr "SVG 저장"
+
+#: src/App.tsx:122
+msgid "Language"
+msgstr "언어"
+
+#: src/App.tsx:107
+msgid "Perspective"
+msgstr "원근"
+
+#: src/App.tsx:100
+msgid "Position X"
+msgstr "위치 X"
+
+#: src/App.tsx:101
+msgid "Position Y"
+msgstr "위치 Y"
+
+#: src/App.tsx:102
+msgid "Position Z"
+msgstr "위치 Z"
+
+#: src/App.tsx:202
+msgid "Reset color"
+msgstr "색상 초기화"
+
+#: src/App.tsx:198
+msgid "Reset transform"
+msgstr "변형 초기화"
+
+#: src/App.tsx:97
+msgid "Rotate X"
+msgstr "회전 X"
+
+#: src/App.tsx:98
+msgid "Rotate Y"
+msgstr "회전 Y"
+
+#: src/App.tsx:99
+msgid "Rotate Z"
+msgstr "회전 Z"
+
+#: src/App.tsx:103
+msgid "Scale X"
+msgstr "크기 X"
+
+#: src/App.tsx:104
+msgid "Scale Y"
+msgstr "크기 Y"
+
+#: src/App.tsx:116
+#: src/App.tsx:117
+msgid "Search"
+msgstr "검색"
+
+#: src/App.tsx:205
+msgid "Size (px)"
+msgstr "크기 (px)"
+
+#: src/App.tsx:105
+msgid "Skew X"
+msgstr "기울이기 X"
+
+#: src/App.tsx:106
+msgid "Skew Y"
+msgstr "기울이기 Y"
+
+#: src/App.tsx:216
+msgid "Trim to halo"
+msgstr "헤일로에 맞춰 자르기"
