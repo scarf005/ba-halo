@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { type Halo, IDENTITY, matches, project, projector, toSvg } from "./halo"
+import { type Halo, IDENTITY, matches, project, projector, ringTurn, rotate, toSvg } from "./halo"
 
 const close = ([x, y]: [number, number], [ex, ey]: [number, number]) => {
   expect(x).toBeCloseTo(ex)
@@ -23,6 +23,42 @@ describe("projector", () => {
   })
 
   test("orthographic mode ignores depth", () => close(projector({ ...IDENTITY, z: 3 })(1, 1), [1, -1]))
+})
+
+describe("rotate", () => {
+  const tilted = { ...IDENTITY, rotateX: 30, rotateY: -50, rotateZ: 20 }
+
+  test("turning about the local Z axis spins the halo in its own plane", () => {
+    const turned = { ...tilted, ...rotate(tilted, { axis: 2, deg: 90, frame: "local" }) }
+    close(projector(turned)(1, 0), projector(tilted)(0, 1))
+  })
+
+  test("turning about the world Y axis matches a Y rotation of an upright halo", () =>
+    close(
+      projector({ ...IDENTITY, ...rotate(IDENTITY, { axis: 1, deg: 40, frame: "world" }) })(1, 0.5),
+      projector({ ...IDENTITY, rotateY: 40 })(1, 0.5),
+    ))
+
+  test("keeps the orientation through gimbal lock", () => {
+    const locked = { ...IDENTITY, rotateX: 25, rotateY: 80 }
+    const turned = { ...locked, ...rotate(locked, { axis: 1, deg: 10, frame: "local" }) }
+    expect(turned.rotateY).toBeCloseTo(90)
+    close(projector(turned)(1, 0.5), projector({ ...IDENTITY, rotateX: 25, rotateY: 90 })(1, 0.5))
+    close(projector(turned)(0.3, -1), projector({ ...IDENTITY, rotateX: 25, rotateY: 90 })(0.3, -1))
+  })
+})
+
+describe("ringTurn", () => {
+  test("dragging the face-on Z ring counterclockwise on screen turns it positively", () =>
+    expect(ringTurn({ t: IDENTITY, axis: 2, radius: 1, grab: [1, 0], drag: [0, -0.1] })).toBeCloseTo(5.73, 1))
+
+  test("dragging the front of the edge-on X ring down tilts the top toward the camera", () =>
+    expect(
+      ringTurn({ t: { ...IDENTITY, perspective: 8 }, axis: 0, radius: 1, grab: [0, 0], drag: [0, 0.1] }),
+    ).toBeCloseTo(5.01, 1))
+
+  test("dragging across a ring does not turn it", () =>
+    expect(ringTurn({ t: IDENTITY, axis: 2, radius: 1, grab: [1, 0], drag: [0.2, 0] })).toBeCloseTo(0))
 })
 
 describe("project", () => {

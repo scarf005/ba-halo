@@ -2,6 +2,7 @@ import { useLingui } from "@lingui/solid/macro"
 import { createMemo, createResource, createSignal, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import {
+  type Axis,
   bounds,
   FRAME,
   type Glow,
@@ -12,6 +13,9 @@ import {
   matches,
   pathData,
   project,
+  ringPath,
+  ringTurn,
+  rotate,
   type Transform,
   toSvg,
 } from "./halo"
@@ -144,16 +148,44 @@ export const App = () => {
     return Number.isFinite(box.width) && Math.max(box.width, box.height) > 0
   }
 
-  let drag: { x: number; y: number } | undefined
+  /** Rotation rings sit just outside the halo, around its pivot. */
+  const ringRadius = createMemo(() => {
+    let r = 0
+    for (const ring of current()?.polygons.flat() ?? []) {
+      for (let i = 0; i < ring.length; i += 2) r = Math.max(r, Math.hypot(ring[i], ring[i + 1]))
+    }
+    return (r || 1) * 1.15
+  })
+  const AXES: Axis[] = [0, 1, 2]
+  let gizmo!: SVGSVGElement
+  const toFrame = (e: PointerEvent) => {
+    const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(gizmo.getScreenCTM()?.inverse())
+    return [p.x, p.y]
+  }
+
+  /** Dragging a ring turns the halo about that local axis; dragging elsewhere turns it about the screen axes. */
+  let drag: { x: number; y: number } | { axis: Axis; grab: number[]; start: Transform } | undefined
   const endDrag = () => {
     drag = undefined
   }
+  const onPointerDown = (e: PointerEvent & { currentTarget: HTMLElement }) => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const axis = (e.target as Element).closest("[data-axis]")?.getAttribute("data-axis")
+    drag = axis
+      ? { axis: Number(axis) as Axis, grab: toFrame(e), start: { ...transform } }
+      : { x: e.clientX, y: e.clientY }
+  }
   const onPointerMove = (e: PointerEvent) => {
     if (!drag) return
-    setTransform({
-      rotateY: transform.rotateY + (e.clientX - drag.x) / 2,
-      rotateX: transform.rotateX - (e.clientY - drag.y) / 2,
-    })
+    if ("axis" in drag) {
+      const [x, y] = toFrame(e)
+      const { axis, grab, start } = drag
+      const deg = ringTurn({ t: start, axis, radius: ringRadius(), grab, drag: [x - grab[0], y - grab[1]] })
+      setTransform(rotate(start, { axis, deg, frame: "local" }))
+      return
+    }
+    const yawed = rotate(transform, { axis: 1, deg: (e.clientX - drag.x) / 2, frame: "world" })
+    setTransform(rotate(yawed, { axis: 0, deg: (e.clientY - drag.y) / 2, frame: "world" }))
     drag = { x: e.clientX, y: e.clientY }
   }
 
@@ -225,17 +257,36 @@ export const App = () => {
               <h1>{title(halo().names[locale()])}</h1>
               <div
                 class="preview"
-                innerHTML={toSvg({ polygons: projected(), color: fill(), size: 1000, box: FRAME, glow: glowSpec() })}
-                onPointerDown={(e) => {
-                  e.currentTarget.setPointerCapture(e.pointerId)
-                  drag = { x: e.clientX, y: e.clientY }
-                }}
+                onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
                 role="img"
                 aria-label={halo().names[locale()].full}
-              />
+              >
+                <div
+                  class="art"
+                  innerHTML={toSvg({ polygons: projected(), color: fill(), size: 1000, box: FRAME, glow: glowSpec() })}
+                />
+                <svg
+                  ref={gizmo}
+                  class="gizmo"
+                  viewBox={[FRAME.x, FRAME.y, FRAME.width, FRAME.height].join(" ")}
+                  aria-hidden="true"
+                >
+                  <For each={AXES}>
+                    {(axis) => {
+                      const d = createMemo(() => ringPath({ ...transform }, axis, ringRadius()))
+                      return (
+                        <g data-axis={axis}>
+                          <path d={d()} />
+                          <path class="ring-hit" d={d()} />
+                        </g>
+                      )
+                    }}
+                  </For>
+                </svg>
+              </div>
             </>
           )}
         </Show>

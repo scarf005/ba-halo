@@ -133,6 +133,41 @@ button {
   background: var(--stage);
   touch-action: none;
   cursor: grab;
+  position: relative;
+}
+
+.preview > * {
+  position: absolute;
+  inset: 0;
+}
+
+.gizmo {
+  pointer-events: none;
+}
+
+.gizmo path {
+  fill: none;
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.gizmo .ring-hit {
+  stroke: transparent;
+  stroke-width: 16px;
+}
+
+.gizmo [data-axis="0"] {
+  stroke: #e5484d;
+}
+
+.gizmo [data-axis="1"] {
+  stroke: #46a758;
+}
+
+.gizmo [data-axis="2"] {
+  stroke: #3e8ef7;
 }
 
 .controls {

@@ -46,21 +46,61 @@ export const IDENTITY: Transform = {
 }
 
 const rad = (deg: number) => (deg * Math.PI) / 180
+const deg = (rad: number) => (rad * 180) / Math.PI
+
+/** Row-major 3x3 matrix. */
+type Mat3 = number[]
+export type Axis = 0 | 1 | 2
+type Rotation = Pick<Transform, "rotateX" | "rotateY" | "rotateZ">
+
+const mul = (a: Mat3, b: Mat3) =>
+  a.map((_, i) => {
+    const [r, c] = [Math.floor(i / 3) * 3, i % 3]
+    return a[r] * b[c] + a[r + 1] * b[3 + c] + a[r + 2] * b[6 + c]
+  })
+
+const UNIT = [
+  [1, 0, 0],
+  [0, 1, 0],
+  [0, 0, 1],
+]
+
+/** Rodrigues rotation about a unit axis. */
+const axisAngle = ([x, y, z]: number[], degrees: number): Mat3 => {
+  const [c, s] = [Math.cos(rad(degrees)), Math.sin(rad(degrees))]
+  const k = 1 - c
+  return [
+    ...[c + x * x * k, x * y * k - z * s, x * z * k + y * s],
+    ...[y * x * k + z * s, c + y * y * k, y * z * k - x * s],
+    ...[z * x * k - y * s, z * y * k + x * s, c + z * z * k],
+  ]
+}
+
+/** Rotation that applies Z, then Y, then X. */
+const rotation = (t: Rotation) =>
+  mul(mul(axisAngle(UNIT[0], t.rotateX), axisAngle(UNIT[1], t.rotateY)), axisAngle(UNIT[2], t.rotateZ))
+
+/** Inverse of `rotation`; at gimbal lock (rotateY = ±90) it puts the whole roll into rotateX. */
+const euler = (m: Mat3): Rotation => {
+  const y = Math.asin(Math.max(-1, Math.min(1, m[2])))
+  if (Math.cos(y) < 1e-6) return { rotateX: deg(Math.atan2(Math.sign(m[2]) * m[3], m[4])), rotateY: deg(y), rotateZ: 0 }
+  return { rotateX: deg(Math.atan2(-m[5], m[8])), rotateY: deg(y), rotateZ: deg(Math.atan2(-m[1], m[0])) }
+}
+
+/** Turns the halo about one of its own axes ("local") or one of the screen axes ("world"). */
+export const rotate = (t: Rotation, o: { axis: Axis; deg: number; frame: "local" | "world" }) => {
+  const [m, a] = [rotation(t), axisAngle(UNIT[o.axis], o.deg)]
+  return euler(o.frame === "local" ? mul(m, a) : mul(a, m))
+}
 
 /** Scale, skew, rotate Z/Y/X, then translate; returns a 3D point with y pointing up. */
 const placer = (t: Transform) => {
-  const [cx, sx, cy, sy, cz, sz] = [t.rotateX, t.rotateY, t.rotateZ].flatMap((a) => [
-    Math.cos(rad(a)),
-    Math.sin(rad(a)),
-  ])
+  const m = rotation(t)
   const [kx, ky] = [Math.tan(rad(t.skewX)), Math.tan(rad(t.skewY))]
   return (px: number, py: number): [number, number, number] => {
     const [ax, ay] = [px * t.scaleX, py * t.scaleY]
     const [bx, by] = [ax + kx * ay, ay + ky * ax]
-    const [rx, ry] = [bx * cz - by * sz, bx * sz + by * cz]
-    const [ux, uz] = [rx * cy, -rx * sy]
-    const [vy, vz] = [ry * cx - uz * sx, ry * sx + uz * cx]
-    return [ux + t.x, vy + t.y, vz + t.z]
+    return [m[0] * bx + m[1] * by + t.x, m[3] * bx + m[4] * by + t.y, m[6] * bx + m[7] * by + t.z]
   }
 }
 
@@ -103,6 +143,51 @@ export const project = (polygons: number[][][], t: Transform) => {
       return points.length < 3 ? [] : [points.flatMap((p) => toScreen(t, p))]
     }),
   )
+}
+
+const RING_STEPS = 72
+
+/** 3D points of the circle of `radius` around the halo origin, perpendicular to local `axis`, by increasing angle. */
+const ringPoints = (t: Transform, axis: Axis, radius: number) => {
+  const m = rotation(t)
+  const [u, v] = [(axis + 1) % 3, (axis + 2) % 3]
+  const origin = [t.x, t.y, t.z]
+  return Array.from({ length: RING_STEPS }, (_, i) => {
+    const a = (2 * Math.PI * i) / RING_STEPS
+    const [cu, sv] = [Math.cos(a) * radius, Math.sin(a) * radius]
+    return origin.map((o, r) => m[r * 3 + u] * cu + m[r * 3 + v] * sv + o)
+  })
+}
+
+const visible = (t: Transform, p: number[]) => t.perspective <= 0 || p[2] <= t.perspective - NEAR
+
+/** Screen path of a rotation ring, clipped at the camera plane. */
+export const ringPath = (t: Transform, axis: Axis, radius: number) => {
+  let points = ringPoints(t, axis, radius)
+  if (t.perspective > 0) points = clipNear(points, t.perspective - NEAR)
+  return points.length < 3 ? "" : pathData([points.flatMap((p) => toScreen(t, p))])
+}
+
+/**
+ * Degrees to turn about local `axis` after a pointer grabbed its ring at screen point `grab` and moved by `drag`:
+ * the drag along the ring's screen tangent at the grabbed point, so the grabbed point follows the pointer.
+ */
+export const ringTurn = (o: { t: Transform; axis: Axis; radius: number; grab: number[]; drag: number[] }) => {
+  const points = ringPoints(o.t, o.axis, o.radius)
+  const screen = points.map((p) => toScreen(o.t, p))
+  // Where the front and back of an edge-on ring overlap, prefer the front, which is nearer the camera (larger z).
+  const score = (i: number) =>
+    visible(o.t, points[i])
+      ? Math.hypot(screen[i][0] - o.grab[0], screen[i][1] - o.grab[1]) - 0.01 * points[i][2]
+      : Infinity
+  const i = screen.reduce((best, _, j) => (score(j) < score(best) ? j : best), 0)
+  const n = RING_STEPS
+  const [a, b] = [screen[(i + n - 1) % n], screen[(i + 1) % n]]
+  const step = (4 * Math.PI) / n
+  const tangent = [(b[0] - a[0]) / step, (b[1] - a[1]) / step]
+  // Near the ends of an edge-on ring the tangent points at the camera; keep the turn per screen unit bounded there.
+  const length2 = Math.max(tangent[0] ** 2 + tangent[1] ** 2, (0.2 * o.radius) ** 2)
+  return deg((o.drag[0] * tangent[0] + o.drag[1] * tangent[1]) / length2)
 }
 
 const num = (n: number) => String(Math.round(n * 1e4) / 1e4)
