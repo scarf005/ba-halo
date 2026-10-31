@@ -1,0 +1,35 @@
+{
+  "name": "ba-halo",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "vite",
+    "build": "vite build",
+    "data": "node scripts/build-data.ts",
+    "extract": "lingui extract --clean",
+    "check": "biome check . && tsc",
+    "format": "biome check --write ."
+  },
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "@lingui/core": "^6.11.0",
+    "@lingui/solid": "^6.11.0",
+    "solid-js": "^1.9.18"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.4",
+    "@lingui/babel-plugin-lingui-macro": "^6.11.0",
+    "@lingui/cli": "^6.11.0",
+    "@lingui/conf": "^6.11.0",
+    "@lingui/vite-plugin": "^6.11.0",
+    "@types/node": "^26.6.6",
+    "@types/wellknown": "^0.5.8",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vite-plugin-solid": "^2.11.15",
+    "vitest": "^5.0.5",
+    "wellknown": "^0.5.0"
+  },
+  "type": "module",
+  "private": "true"
+}

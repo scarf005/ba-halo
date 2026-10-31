@@ -1,0 +1,13 @@
+repos:
+  - repo: local
+    hooks:
+      - {
+          id: biome,
+          name: biome,
+          entry: pnpm exec biome check --write,
+          language: system,
+          types_or: [ts, tsx, json, css],
+          pass_filenames: true,
+        }
+      - { id: types, name: tsc, entry: pnpm exec tsc, language: system, pass_filenames: false, types_or: [ts, tsx] }
+      - { id: test, name: vitest, entry: pnpm test, language: system, pass_filenames: false, types_or: [ts, tsx] }
