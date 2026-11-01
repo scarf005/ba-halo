@@ -65,6 +65,8 @@ const svgToPng = (svg: string) =>
   })
 
 const Thumb = (props: { halo: Halo }) => {
+  const prerendered = props.halo.mesh?.thumb
+  if (prerendered) return <img src={`./${prerendered}`} alt="" loading="lazy" />
   const polygons = project(props.halo.polygons, IDENTITY)
   const box = bounds(polygons)
   const pad = Math.max(box.width, box.height) * 0.05
@@ -147,9 +149,9 @@ export const App = () => {
 
   const wants3d = () => {
     const mesh = current()?.mesh
-    return !!mesh && (view() ?? (mesh.flat ? "2d" : "3d")) === "3d"
+    return !!mesh && (!mesh.flat || view() === "3d")
   }
-  /** Three.js and the mesh load only when a halo is first shown in 3D; 2D stays on screen until then. */
+  /** Three.js and the mesh load only when a halo is first shown in 3D; a 2D view stays on screen until then. */
   const [vertices] = createResource(
     () => (wants3d() ? current()?.mesh?.file : undefined),
     async (file) => {
@@ -262,8 +264,9 @@ export const App = () => {
       (b) => download(b, `${fileName()}.png`),
       () => flash(t`Save failed`),
     )
-  /** Nothing to export before data loads, or when scaling or clipping leaves no area. */
+  /** Nothing to export before data or the wanted mesh loads, or when scaling or clipping leaves no area. */
   const exportable = () => {
+    if (wants3d() && !shown3d()) return false
     const box = bounds(projected())
     return Number.isFinite(box.width) && Math.max(box.width, box.height) > 0
   }
@@ -406,7 +409,10 @@ export const App = () => {
         >
           <svg class="filters" aria-hidden="true" innerHTML={canvasGlow()} />
           <canvas ref={haloCanvas} hidden={!shown3d()} style={{ filter: glowing() ? "url(#canvas-glow)" : "none" }} />
-          <Show when={current() && !shown3d()}>
+          <Show when={!shown3d() && current()?.mesh?.thumb}>
+            {(thumb) => <img class="still" src={`./${thumb()}`} alt="" />}
+          </Show>
+          <Show when={current() && !shown3d() && !current()?.mesh?.thumb}>
             <div
               class="art"
               innerHTML={toSvg({
@@ -472,7 +478,7 @@ export const App = () => {
           {(mesh) => (
             <>
               <div class="actions">
-                <button type="button" aria-pressed={!wants3d()} onClick={() => setView("2d")}>
+                <button type="button" aria-pressed={!wants3d()} disabled={!mesh().flat} onClick={() => setView("2d")}>
                   2D
                 </button>
                 <button type="button" aria-pressed={wants3d()} onClick={() => setView("3d")}>

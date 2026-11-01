@@ -2,9 +2,11 @@
 // game's scenario name table into public/data/halos.json
 import { mkdir, readdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { Document, MathUtils, NodeIO } from "@gltf-transform/core"
+import { Document, MathUtils, type Mesh, NodeIO } from "@gltf-transform/core"
+import sharp from "sharp"
 import wellknown from "wellknown"
 import { fitHalo } from "./fit-halo.ts"
+import { renderHalo, restView, type Texture } from "./render-halo.ts"
 
 const MODELS = process.env.MODELS_DIR ?? "../BlueArchiveModels"
 // Halo Forge spellings that differ from the model file names.
@@ -141,6 +143,7 @@ const entries = Object.entries(halos).map(([key, { color, wkt }]) => {
 // A halo is flat when it is thin and its face-on silhouette resembles the outline. Outlines of tilted 3D halos such as
 // Noa's show an oblique view, which overlaps the face-on mesh poorly.
 const [MAX_FLAT_DEPTH, MIN_FLAT_OVERLAP] = [0.15, 0.3]
+const [THUMB_SIZE, THUMB_SAMPLES] = [512, 2]
 const io = new NodeIO()
 const modelFiles = (await readdir(MODELS)).filter((f) => f.endsWith(".glb")).sort()
 
@@ -158,7 +161,9 @@ const fitModel = async (file: string, polygons: number[][][]) => {
     throw new Error(`${file}: halo primitives do not share one vertex list`)
   }
   const scale: [number, number, number] = [1, 1, 1]
-  MathUtils.decompose(node.getWorldMatrix(), [0, 0, 0], [0, 0, 0, 1], scale)
+  const world = node.getWorldMatrix()
+  MathUtils.decompose(world, [0, 0, 0], [0, 0, 0, 1], scale)
+  const rest = [0, 1, 2].flatMap((row) => [0, 1, 2].map((column) => world[column * 4 + row] / scale[column]))
   const scaled = (source: ArrayLike<number>) => Float32Array.from(source, (v, i) => v * scale[i % 3])
   const vertices = scaled(positions.getArray() ?? [])
   const triangles = mesh.listPrimitives().flatMap((p) => [...(p.getIndices()?.getArray() ?? [])])
@@ -167,6 +172,7 @@ const fitModel = async (file: string, polygons: number[][][]) => {
     mesh,
     fit,
     vertices,
+    rest,
     entry: {
       file,
       scale: scale.map(round6),
@@ -177,14 +183,56 @@ const fitModel = async (file: string, polygons: number[][][]) => {
   }
 }
 
+const decode = async (image: Uint8Array): Promise<Texture> => {
+  const { data, info } = await sharp(image).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  return { data, width: info.width, height: info.height }
+}
+
+// Prerenders a halo as the character wears it, supersampled, for showing it without loading its mesh.
+const writeThumb = async (o: {
+  slug: string
+  color: string
+  vertices: ArrayLike<number>
+  mesh: Mesh
+  turn: number[]
+}) => {
+  const fill = await sharp({ create: { width: 1, height: 1, channels: 3, background: o.color } })
+    .raw()
+    .toBuffer()
+  const primitives = await Promise.all(
+    o.mesh.listPrimitives().map(async (p) => {
+      const image = p.getMaterial()?.getBaseColorTexture()?.getImage()
+      return {
+        triangles: p.getIndices()?.getArray() ?? [],
+        uv: p.getAttribute("TEXCOORD_0")?.getArray() ?? undefined,
+        texture: image ? await decode(image) : undefined,
+        color: [...fill],
+        cutout: p.getMaterial()?.getAlphaMode() !== "OPAQUE",
+      }
+    }),
+  )
+  const pixels = renderHalo({ vertices: o.vertices, primitives, turn: o.turn, size: THUMB_SIZE * THUMB_SAMPLES })
+  await mkdir("public/data/thumb", { recursive: true })
+  await sharp(pixels, { raw: { width: THUMB_SIZE * THUMB_SAMPLES, height: THUMB_SIZE * THUMB_SAMPLES, channels: 4 } })
+    .resize(THUMB_SIZE)
+    .webp()
+    .toFile(`public/data/thumb/${o.slug}.webp`)
+  return `data/thumb/${o.slug}.webp`
+}
+
 // Bakes the base model's halo mesh into its own GLB, turned, scaled and centered to overlay the Halo Forge outline.
-const extractMesh = async (key: string, polygons: number[][][]) => {
+const extractMesh = async (key: string, polygons: number[][][], color: string) => {
   const base = MODEL_NAMES[key] ?? key
   if (!modelFiles.includes(`${base}.glb`)) return
   const fitted = await fitModel(`${base}.glb`, polygons)
   if (!fitted) return
-  const { mesh, fit, vertices } = fitted
+  const { mesh, fit, vertices, rest } = fitted
   const { basis, center, unit } = fit
+  const positions = Float32Array.from(vertices, (_, i) => {
+    const [row, v] = [(i % 3) * 3, i - (i % 3)]
+    const turned = basis[row] * vertices[v] + basis[row + 1] * vertices[v + 1] + basis[row + 2] * vertices[v + 2]
+    return (turned - center[i % 3]) * unit
+  })
 
   const costumes = []
   for (const file of modelFiles.filter((f) => f.startsWith(`${base} (`))) {
@@ -199,11 +247,6 @@ const extractMesh = async (key: string, polygons: number[][][]) => {
   const accessor = (type: "VEC2" | "VEC3" | "SCALAR", array: Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer>) =>
     out.createAccessor().setType(type).setArray(array).setBuffer(buffer)
   for (const p of mesh.listPrimitives()) {
-    const positions = Float32Array.from(vertices, (_, i) => {
-      const [row, v] = [(i % 3) * 3, i - (i % 3)]
-      const turned = basis[row] * vertices[v] + basis[row + 1] * vertices[v + 1] + basis[row + 2] * vertices[v + 2]
-      return (turned - center[i % 3]) * unit
-    })
     const primitive = out.createPrimitive().setAttribute("POSITION", accessor("VEC3", positions))
     const uv = p.getAttribute("TEXCOORD_0")?.getArray()
     if (uv) primitive.setAttribute("TEXCOORD_0", accessor("VEC2", Float32Array.from(uv)))
@@ -226,15 +269,19 @@ const extractMesh = async (key: string, polygons: number[][][]) => {
   const slug = key.toLowerCase().replace(/\W+/g, "-")
   await mkdir("public/data/mesh", { recursive: true })
   await writeFile(`public/data/mesh/${slug}.glb`, await io.writeBinary(out))
+  const flat = fit.depth < MAX_FLAT_DEPTH && fit.overlap >= MIN_FLAT_OVERLAP
   return {
     file: `data/mesh/${slug}.glb`,
-    flat: fit.depth < MAX_FLAT_DEPTH && fit.overlap >= MIN_FLAT_OVERLAP,
+    flat,
+    thumb: flat ? undefined : await writeThumb({ slug, color, vertices: positions, mesh, turn: restView(rest, basis) }),
     models: [fitted.entry, ...costumes],
   }
 }
 
 const withMeshes = []
-for (const entry of entries) withMeshes.push({ ...entry, mesh: await extractMesh(entry.key, entry.polygons) })
+for (const entry of entries) {
+  withMeshes.push({ ...entry, mesh: await extractMesh(entry.key, entry.polygons, entry.color) })
+}
 
 const schools = Object.fromEntries(
   [...new Set(entries.flatMap((e) => (e.school ? [e.school] : [])))].map((id) => [

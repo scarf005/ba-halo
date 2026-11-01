@@ -16,8 +16,10 @@ export type Halo = {
 /** 3D halo extracted from a character model; `file` holds it in halo units, loaded only when shown. */
 export type HaloMesh = {
   file: string
-  /** Whether the 2D outline already shows this halo faithfully, so 2D is the default view. */
+  /** Whether the 2D outline shows this halo faithfully; 2D is then the default view, and otherwise unavailable. */
   flat: boolean
+  /** Prerendered WebP of a halo that is not flat, shown in place of its outline. */
+  thumb?: string
   /** The character's model, then its costumes that have a halo. */
   models: HaloModel[]
 }

@@ -47,6 +47,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
 .app {
   display: grid;
   grid-template-columns: 300px 1fr 340px;
@@ -96,7 +101,8 @@ button {
   outline: 1px solid var(--accent);
 }
 
-.halo-list svg {
+.halo-list svg,
+.halo-list img {
   width: 100%;
   aspect-ratio: 1;
   padding: 6px;
@@ -267,6 +273,14 @@ output {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.preview .still {
+  inset: 30%;
+  width: 40%;
+  height: 40%;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .preview .view-controls {
