@@ -15,16 +15,20 @@
   "dependencies": {
     "@lingui/core": "^6.11.0",
     "@lingui/solid": "^6.11.0",
-    "solid-js": "^1.9.18"
+    "solid-js": "^1.9.18",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
+    "@gltf-transform/core": "^4.5.1",
     "@lingui/babel-plugin-lingui-macro": "^6.11.0",
     "@lingui/cli": "^6.11.0",
     "@lingui/conf": "^6.11.0",
     "@lingui/vite-plugin": "^6.11.0",
     "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
     "@types/wellknown": "^0.5.8",
+    "ml-matrix": "^6.15.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vite-plugin-solid": "^2.11.15",
