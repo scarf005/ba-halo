@@ -9,23 +9,28 @@ const MODEL_FIT = 0.85
 const loader = new GLTFLoader()
 
 /** Camera matching the 2D projection: the frame fills the view at z = 0, and `perspective` is the camera distance. */
-const camera = (t: Transform, box?: Box) => {
+const camera = (t: Transform, box: Box) => {
   const half = FRAME.width / 2
   const view =
     t.perspective > 0
       ? new THREE.PerspectiveCamera(2 * THREE.MathUtils.radToDeg(Math.atan(half / t.perspective)), 1, 0.05, 1000)
       : new THREE.OrthographicCamera(-half, half, half, -half, 0.1, 1000)
   view.position.z = t.perspective > 0 ? t.perspective : 500
-  if (box) view.setViewOffset(FRAME.width, FRAME.height, box.x - FRAME.x, box.y - FRAME.y, box.width, box.height)
+  view.setViewOffset(FRAME.width, FRAME.height, box.x - FRAME.x, box.y - FRAME.y, box.width, box.height)
   view.updateProjectionMatrix()
   view.updateMatrixWorld()
   return view
 }
 
-const renderer = (canvas: HTMLCanvasElement) => {
-  const r = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true })
-  r.setSize(1000, 1000, false)
-  return r
+/** The part of the scene to draw, and the canvas size in pixels to draw it at. */
+export type Viewport = { box: Box; width: number; height: number }
+
+const renderer = (canvas: HTMLCanvasElement) =>
+  new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true })
+
+/** Resizing a canvas clears it, even to the same size. */
+const resize = (gl: THREE.WebGLRenderer, { width, height }: Viewport) => {
+  if (gl.domElement.width !== width || gl.domElement.height !== height) gl.setSize(width, height, false)
 }
 
 const unlit = (material: THREE.Material | THREE.Material[]) => {
@@ -67,14 +72,15 @@ export const createHaloView = (canvas: HTMLCanvasElement) => {
   let vertices: number[] = []
   let loads = 0
 
-  const draw = (t: Transform, colors: HaloColors, box?: Box) => {
+  const draw = (t: Transform, colors: HaloColors, viewport: Viewport) => {
     if (!halo) return
+    resize(gl, viewport)
     for (const m of meshes(halo)) {
       const material = m.material as THREE.MeshBasicMaterial
       material.color.set(material.map ? colors.textured : colors.plain)
     }
     place(halo, new THREE.Matrix4().fromArray(placement(t)))
-    gl.render(scene, camera(t, box))
+    gl.render(scene, camera(t, viewport.box))
   }
 
   return {
@@ -94,14 +100,10 @@ export const createHaloView = (canvas: HTMLCanvasElement) => {
       return vertices
     },
     draw,
-    /** The halo alone at `width` x `height` pixels, cropped to `box`, as a PNG data URL. */
-    capture: (o: { t: Transform; colors: HaloColors; box: Box; width: number; height: number }) => {
-      gl.setSize(o.width, o.height, false)
-      draw(o.t, o.colors, o.box)
-      const url = canvas.toDataURL("image/png")
-      gl.setSize(1000, 1000, false)
-      draw(o.t, o.colors)
-      return url
+    /** The halo alone at `width` x `height` pixels, cropped to `box`, as a PNG data URL; draw again to restore. */
+    capture: (o: Viewport & { t: Transform; colors: HaloColors }) => {
+      draw(o.t, o.colors, o)
+      return canvas.toDataURL("image/png")
     },
   }
 }
@@ -127,11 +129,12 @@ export const createModelView = (canvas: HTMLCanvasElement) => {
     return new THREE.Matrix4().multiplyMatrices(node.matrixWorld, fromHalo)
   }
 
-  const draw = (t: Transform) => {
+  const draw = (t: Transform, viewport: Viewport) => {
     if (!root) return gl.clear()
+    resize(gl, viewport)
     const body = new THREE.Matrix4().fromArray(placement(t)).multiply(haloPose.clone().invert())
     place(root, body)
-    gl.render(scene, camera(t))
+    gl.render(scene, camera(t, viewport.box))
   }
 
   const clear = () => {

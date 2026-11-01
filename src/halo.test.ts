@@ -1,7 +1,9 @@
 import { describe, expect, test } from "vitest"
 import {
   DEFAULT_GLOW,
+  FRAME,
   type Halo,
+  HOME_VIEW,
   IDENTITY,
   matches,
   placement,
@@ -12,6 +14,10 @@ import {
   ringTurn,
   rotate,
   toSvg,
+  type View,
+  viewBoxOf,
+  viewed,
+  zoomAt,
 } from "./halo"
 
 const close = ([x, y]: [number, number], [ex, ey]: [number, number]) => {
@@ -93,6 +99,67 @@ describe("repose", () => {
     )
     expect([moved.x, moved.y, moved.z]).toEqual([expect.closeTo(1), expect.closeTo(2), expect.closeTo(0)])
     expect(moved.scaleX).toBe(2)
+  })
+})
+
+describe("view", () => {
+  const onStage = (v: View, [px, py]: number[]) => {
+    const [x, y] = projector(viewed(IDENTITY, v))(px, py)
+    const box = viewBoxOf(v)
+    return [(x - box.x) / box.width, (y - box.y) / box.height]
+  }
+
+  test("the home view shows the frame unchanged", () => {
+    expect(viewBoxOf(HOME_VIEW)).toEqual(FRAME)
+    expect(viewed(IDENTITY, HOME_VIEW)).toEqual(IDENTITY)
+  })
+
+  test("moving the camera moves the scene the other way without changing the transform", () => {
+    const t = { ...IDENTITY, x: 1 }
+    const shown = viewed(t, { ...HOME_VIEW, x: 0.5, y: 0.25, z: -1 })
+    expect([shown.x, shown.y, shown.z]).toEqual([0.5, -0.25, 1])
+    expect(t.x).toBe(1)
+  })
+
+  test("zooming narrows the box around the center", () =>
+    expect(viewBoxOf({ ...HOME_VIEW, zoom: 2 })).toEqual({ x: -1.25, y: -1.25, width: 2.5, height: 2.5 }))
+
+  test.each([
+    [2, { x: -5, y: -2.5, width: 10, height: 5 }],
+    [0.5, { x: -2.5, y: -5, width: 5, height: 10 }],
+  ])("a stage of aspect %d shows the whole frame and extra scene along its longer side", (aspect, box) =>
+    expect(viewBoxOf(HOME_VIEW, aspect)).toEqual(box),
+  )
+
+  test("zooming keeps the point under the cursor in place", () => {
+    const before = { ...HOME_VIEW, x: 0.3, y: -0.2, zoom: 1.5 }
+    const point = [0.7, 0.4]
+    const [x, y] = projector(viewed(IDENTITY, before))(point[0], point[1])
+    const after = zoomAt(before, { at: [x, y], factor: 3, t: IDENTITY })
+    expect(after.zoom).toBeCloseTo(4.5)
+    const [a, b] = [onStage(before, point), onStage(after, point)]
+    expect(b[0]).toBeCloseTo(a[0])
+    expect(b[1]).toBeCloseTo(a[1])
+  })
+
+  test("zooming keeps the point under the cursor in place when perspective enlarges its depth", () => {
+    const t = { ...IDENTITY, perspective: 8, z: 1 }
+    const before = { ...HOME_VIEW, x: 0.3, z: 3, zoom: 1.5 }
+    const stageOf = (v: View, [px, py]: number[]) => {
+      const [x, y] = projector(viewed(t, v))(px, py)
+      return [x * v.zoom, y * v.zoom]
+    }
+    const point = [0.7, 0.4]
+    const at = projector(viewed(t, before))(point[0], point[1])
+    const after = zoomAt(before, { at, factor: 3, t })
+    const [a, b] = [stageOf(before, point), stageOf(after, point)]
+    expect(b[0]).toBeCloseTo(a[0])
+    expect(b[1]).toBeCloseTo(a[1])
+  })
+
+  test("zoom stops at its limits and then does not pan", () => {
+    const most = { ...HOME_VIEW, zoom: 20 }
+    expect(zoomAt(most, { at: [1, 1], factor: 2, t: IDENTITY })).toEqual(most)
   })
 })
 

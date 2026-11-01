@@ -276,6 +276,38 @@ export const bounds = (polygons: number[][][]): Box => {
 
 export const FRAME: Box = { x: -2.5, y: -2.5, width: 5, height: 5 }
 
+/** The preview's camera, separate from the transform so it never changes an export; y points up. */
+export type View = { x: number; y: number; z: number; zoom: number }
+
+export const HOME_VIEW: View = { x: 0, y: 0, z: 0, zoom: 1 }
+
+const [MIN_ZOOM, MAX_ZOOM] = [0.25, 20]
+
+/** Moving the camera is moving the scene the other way. */
+export const viewed = (t: Transform, v: View): Transform => ({ ...t, x: t.x - v.x, y: t.y - v.y, z: t.z - v.z })
+
+/** What a stage of `aspect` (width / height) shows: the frame fits its shorter side, and the rest is extra scene. */
+export const viewBoxOf = (v: View, aspect = 1): Box => {
+  const [wide, tall] = [Math.max(aspect, 1), Math.max(1 / aspect, 1)]
+  return {
+    x: (FRAME.x * wide) / v.zoom,
+    y: (FRAME.y * tall) / v.zoom,
+    width: (FRAME.width * wide) / v.zoom,
+    height: (FRAME.height * tall) / v.zoom,
+  }
+}
+
+/**
+ * Zooms by `factor` and pans so what is at screen point `at`, at the depth of `t`, stays under the cursor; perspective
+ * enlarges a pan at that depth, so the pan shrinks to match.
+ */
+export const zoomAt = (v: View, o: { at: number[]; factor: number; t: Transform }): View => {
+  const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.zoom * o.factor))
+  const gap = o.t.perspective - (o.t.z - v.z)
+  const moved = (1 - v.zoom / zoom) * (o.t.perspective > 0 && gap > 0 ? gap / o.t.perspective : 1)
+  return { ...v, zoom, x: v.x + o.at[0] * moved, y: v.y - o.at[1] * moved }
+}
+
 const grow = (b: Box, by: number): Box => ({
   x: b.x - by,
   y: b.y - by,

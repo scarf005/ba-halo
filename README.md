@@ -5,6 +5,8 @@
 Search Blue Archive halos by name, school, or club, filter them by school, rotate and move them in 3D, add a glow, and
 copy or save them as SVG or transparent PNG.
 Halos with a character model also have a textured 3D view. Load the model to pose the halo on the character.
+Scroll on the preview to zoom, and use the X, Y, and Z fields at its bottom right to move the view. These do not change
+exports.
 The UI is in English, Japanese, and Korean.
 
 3D halos export as an SVG that holds a PNG of the render, because the mesh textures have no vector form.

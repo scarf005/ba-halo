@@ -11,6 +11,7 @@ import {
   glowFilter,
   type Halo,
   type HaloData,
+  HOME_VIEW,
   IDENTITY,
   type Locale,
   matches,
@@ -23,6 +24,10 @@ import {
   rotate,
   type Transform,
   toSvg,
+  type View,
+  viewBoxOf,
+  viewed,
+  zoomAt,
 } from "./halo"
 import { activate, LOCALES } from "./i18n"
 import type { createHaloView, createModelView } from "./scene"
@@ -122,7 +127,8 @@ export const App = () => {
   /** Index into the model's animations; names can repeat. */
   const [clip, setClip] = createSignal<number>()
   const [clipTime, setClipTime] = createSignal(0)
-  const [stageSize, setStageSize] = createSignal(1000)
+  const [stage, setStage] = createSignal({ width: 1000, height: 1000 })
+  const [camera, setCamera] = createStore<View>({ ...HOME_VIEW })
 
   const filtered = createMemo(() =>
     (data()?.halos ?? []).filter((h) => (school() === undefined || h.school === school()) && matches(h, query())),
@@ -155,8 +161,17 @@ export const App = () => {
   const shown3d = () => wants3d() && !vertices.loading && !vertices.error && !!vertices()
   /** The texture's own colors unless the user picked a color, which tints them; untextured halos use the fill. */
   const colors = () => ({ textured: color() ?? "#fff", plain: fill() })
+  /** What the preview shows; exports use `transform` and ignore the camera. */
+  const shown = () => viewed({ ...transform }, camera)
+  const box = () => viewBoxOf(camera, stage().width / stage().height)
+  const viewport = () => ({
+    box: box(),
+    width: Math.round(stage().width * devicePixelRatio),
+    height: Math.round(stage().height * devicePixelRatio),
+  })
+  const drawHalo = () => haloView?.draw(shown(), colors(), viewport())
   createEffect(() => {
-    if (shown3d()) haloView?.draw({ ...transform }, colors())
+    if (shown3d()) drawHalo()
   })
 
   const projected = createMemo(() => {
@@ -173,13 +188,19 @@ export const App = () => {
       size: size(),
       box: trim() ? undefined : FRAME,
       glow: glowSpec(),
-      image: shown3d() ? (o) => haloView?.capture({ ...o, t: { ...transform }, colors: colors() }) ?? "" : undefined,
+      image: shown3d()
+        ? (o) => {
+            const url = haloView?.capture({ ...o, t: { ...transform }, colors: colors() }) ?? ""
+            drawHalo()
+            return url
+          }
+        : undefined,
     })
   /** The same glow on the live canvas, whose filter works in CSS pixels. */
   const canvasGlow = () => {
-    const pixels = stageSize() / FRAME.width
-    const box = { x: 0, y: 0, width: 1e4, height: 1e4 }
-    return `<defs>${glowFilter({ ...glowSpec(), radius: glow.radius * pixels }, box, "canvas-glow")}</defs>`
+    const pixels = stage().width / box().width
+    const region = { x: 0, y: 0, width: 1e4, height: 1e4 }
+    return `<defs>${glowFilter({ ...glowSpec(), radius: glow.radius * pixels }, region, "canvas-glow")}</defs>`
   }
 
   const [model] = createResource(modelFile, async (file) => {
@@ -202,7 +223,7 @@ export const App = () => {
   })
   const modelShown = () => !!modelFile() && !model.loading && !model.error && !!model()
   createEffect(() => {
-    if (modelShown()) modelView?.draw({ ...transform })
+    if (modelShown()) modelView?.draw(shown(), viewport())
     else modelView?.clear()
   })
   createEffect(() => {
@@ -219,6 +240,7 @@ export const App = () => {
     on(current, () => {
       setView()
       setModelFile()
+      setCamera({ ...HOME_VIEW })
     }),
   )
   const fileName = () => `halo-${current()?.key.toLowerCase().replace(/\W+/g, "-")}`
@@ -256,14 +278,23 @@ export const App = () => {
   })
   const AXES: Axis[] = [0, 1, 2]
   let gizmo!: SVGSVGElement
-  const observeStage = (stage: HTMLDivElement) => {
-    const observer = new ResizeObserver(() => setStageSize(Math.min(stage.clientWidth, stage.clientHeight)))
-    observer.observe(stage)
+  const observeStage = (el: HTMLElement) => {
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth && el.clientHeight) setStage({ width: el.clientWidth, height: el.clientHeight })
+    })
+    observer.observe(el)
     onCleanup(() => observer.disconnect())
   }
-  const toFrame = (e: PointerEvent) => {
+  const toFrame = (e: MouseEvent) => {
     const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(gizmo.getScreenCTM()?.inverse())
     return [p.x, p.y]
+  }
+  const onWheel = (e: WheelEvent) => {
+    if (!current()) return
+    e.preventDefault()
+    // A ring drag measures from where it grabbed in the current box.
+    if (drag && "axis" in drag) return
+    setCamera(zoomAt({ ...camera }, { at: toFrame(e), factor: Math.exp(-e.deltaY / 500), t: { ...transform } }))
   }
 
   /** Dragging a ring turns the halo about that local axis; dragging elsewhere turns it about the screen axes. */
@@ -272,6 +303,7 @@ export const App = () => {
     drag = undefined
   }
   const onPointerDown = (e: PointerEvent & { currentTarget: HTMLElement }) => {
+    if ((e.target as Element).closest(".view-controls")) return
     e.currentTarget.setPointerCapture(e.pointerId)
     const axis = (e.target as Element).closest("[data-axis]")?.getAttribute("data-axis")
     drag = axis
@@ -283,7 +315,13 @@ export const App = () => {
     if ("axis" in drag) {
       const [x, y] = toFrame(e)
       const { axis, grab, start } = drag
-      const deg = ringTurn({ t: start, axis, radius: ringRadius(), grab, drag: [x - grab[0], y - grab[1]] })
+      const deg = ringTurn({
+        t: viewed(start, camera),
+        axis,
+        radius: ringRadius(),
+        grab,
+        drag: [x - grab[0], y - grab[1]],
+      })
       setTransform(rotate(start, { axis, deg, frame: "local" }))
       return
     }
@@ -356,14 +394,14 @@ export const App = () => {
       <main class="editor">
         <h1>{heading()}</h1>
         {/* Stays mounted, because the WebGL views stay bound to its canvases. */}
-        <div
+        <section
           ref={observeStage}
           class="preview"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
-          role="img"
+          onWheel={onWheel}
           aria-label={current()?.names[locale()].full}
         >
           <svg class="filters" aria-hidden="true" innerHTML={canvasGlow()} />
@@ -372,10 +410,10 @@ export const App = () => {
             <div
               class="art"
               innerHTML={toSvg({
-                polygons: projected(),
+                polygons: project(current()?.polygons ?? [], shown()),
                 color: fill(),
                 size: 1000,
-                box: FRAME,
+                box: box(),
                 glow: glowSpec(),
               })}
             />
@@ -385,12 +423,12 @@ export const App = () => {
             <svg
               ref={gizmo}
               class="gizmo"
-              viewBox={[FRAME.x, FRAME.y, FRAME.width, FRAME.height].join(" ")}
+              viewBox={[box().x, box().y, box().width, box().height].join(" ")}
               aria-hidden="true"
             >
               <For each={AXES}>
                 {(axis) => {
-                  const d = createMemo(() => ringPath({ ...transform }, axis, ringRadius()))
+                  const d = createMemo(() => ringPath(shown(), axis, ringRadius()))
                   return (
                     <g data-axis={axis}>
                       <path d={d()} />
@@ -400,8 +438,27 @@ export const App = () => {
                 }}
               </For>
             </svg>
+            <div class="view-controls">
+              <For each={["x", "y", "z"] as const}>
+                {(axis) => (
+                  <label>
+                    <span>{axis.toUpperCase()}</span>
+                    <input
+                      type="number"
+                      step={0.1}
+                      value={Math.round(camera[axis] * 100) / 100}
+                      onChange={(e) => {
+                        setCamera(axis, e.currentTarget.valueAsNumber || 0)
+                        e.currentTarget.value = String(camera[axis])
+                      }}
+                    />
+                  </label>
+                )}
+              </For>
+              <button type="button" onClick={() => setCamera({ ...HOME_VIEW })}>{t`Reset view`}</button>
+            </div>
           </Show>
-        </div>
+        </section>
       </main>
       <section class="controls">
         <For each={sliders()}>
