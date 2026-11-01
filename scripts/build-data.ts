@@ -1,8 +1,18 @@
 // Joins halo outlines from Halo Forge with student, boss, school and club names from SchaleDB and NPC names from the
 // game's scenario name table into public/data/halos.json
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, readdir, writeFile } from "node:fs/promises"
+import { join } from "node:path"
+import { Document, MathUtils, NodeIO } from "@gltf-transform/core"
 import wellknown from "wellknown"
+import { fitHalo } from "./fit-halo.ts"
 
+const MODELS = process.env.MODELS_DIR ?? "../BlueArchiveModels"
+// Halo Forge spellings that differ from the model file names.
+const MODEL_NAMES: Record<string, string> = {
+  Alice: "Arisu",
+  Miku: "Hatsune Miku",
+  "Shiroko Terror": "Shiroko＊Terror",
+}
 const HALOS = "https://raw.githubusercontent.com/dobrosketchkun/halo_forge/main/halo/data/ba_halos.json"
 const SCENARIO_NAMES =
   "https://raw.githubusercontent.com/electricgoat/ba-data/global/Excel/ScenarioCharacterNameExcelTable.json"
@@ -37,6 +47,7 @@ const perLang = async <T>(load: (db: string) => Promise<T>) =>
   >
 
 const round = (n: number) => Math.round(n * 1e4) / 1e4
+const round6 = (n: number) => Math.round(n * 1e6) / 1e6
 const fullName = (s: Student) =>
   [s.FamilyName, s.PersonalName]
     .map((n) => n.trim())
@@ -127,6 +138,104 @@ const entries = Object.entries(halos).map(([key, { color, wkt }]) => {
   }
 })
 
+// A halo is flat when it is thin and its face-on silhouette resembles the outline. Outlines of tilted 3D halos such as
+// Noa's show an oblique view, which overlaps the face-on mesh poorly.
+const [MAX_FLAT_DEPTH, MIN_FLAT_OVERLAP] = [0.15, 0.3]
+const io = new NodeIO()
+const modelFiles = (await readdir(MODELS)).filter((f) => f.endsWith(".glb")).sort()
+
+// Fits a model's halo mesh to the outline. The halo node's own scale, which can be nonuniform or mirrored, is baked into
+// the vertices, so what remains between halo units and the model is a rotation, a shift and one uniform unit.
+const fitModel = async (file: string, polygons: number[][][]) => {
+  const model = (await io.read(join(MODELS, file))).getRoot()
+  const mesh = model.listMeshes().find((m) => /halo/i.test(m.getName()))
+  const node = model.listNodes().find((n) => n.getMesh() === mesh)
+  if (!mesh || !node || node.getSkin()) return
+
+  const [first] = mesh.listPrimitives()
+  const positions = first.getAttribute("POSITION")
+  if (!positions || mesh.listPrimitives().some((p) => p.getAttribute("POSITION") !== positions)) {
+    throw new Error(`${file}: halo primitives do not share one vertex list`)
+  }
+  const scale: [number, number, number] = [1, 1, 1]
+  MathUtils.decompose(node.getWorldMatrix(), [0, 0, 0], [0, 0, 0, 1], scale)
+  const scaled = (source: ArrayLike<number>) => Float32Array.from(source, (v, i) => v * scale[i % 3])
+  const vertices = scaled(positions.getArray() ?? [])
+  const triangles = mesh.listPrimitives().flatMap((p) => [...(p.getIndices()?.getArray() ?? [])])
+  const fit = fitHalo({ vertices, triangles, polygons })
+  return {
+    mesh,
+    fit,
+    vertices,
+    entry: {
+      file,
+      scale: scale.map(round6),
+      basis: fit.basis.map(round6),
+      center: fit.center.map(round6),
+      unit: round6(fit.unit),
+    },
+  }
+}
+
+// Bakes the base model's halo mesh into its own GLB, turned, scaled and centered to overlay the Halo Forge outline.
+const extractMesh = async (key: string, polygons: number[][][]) => {
+  const base = MODEL_NAMES[key] ?? key
+  if (!modelFiles.includes(`${base}.glb`)) return
+  const fitted = await fitModel(`${base}.glb`, polygons)
+  if (!fitted) return
+  const { mesh, fit, vertices } = fitted
+  const { basis, center, unit } = fit
+
+  const costumes = []
+  for (const file of modelFiles.filter((f) => f.startsWith(`${base} (`))) {
+    const costume = await fitModel(file, polygons)
+    if (costume) costumes.push(costume.entry)
+  }
+
+  const out = new Document()
+  const buffer = out.createBuffer()
+  const haloMesh = out.createMesh("halo")
+  out.createScene().addChild(out.createNode("halo").setMesh(haloMesh))
+  const accessor = (type: "VEC2" | "VEC3" | "SCALAR", array: Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer>) =>
+    out.createAccessor().setType(type).setArray(array).setBuffer(buffer)
+  for (const p of mesh.listPrimitives()) {
+    const positions = Float32Array.from(vertices, (_, i) => {
+      const [row, v] = [(i % 3) * 3, i - (i % 3)]
+      const turned = basis[row] * vertices[v] + basis[row + 1] * vertices[v + 1] + basis[row + 2] * vertices[v + 2]
+      return (turned - center[i % 3]) * unit
+    })
+    const primitive = out.createPrimitive().setAttribute("POSITION", accessor("VEC3", positions))
+    const uv = p.getAttribute("TEXCOORD_0")?.getArray()
+    if (uv) primitive.setAttribute("TEXCOORD_0", accessor("VEC2", Float32Array.from(uv)))
+    const indices = p.getIndices()?.getArray()
+    if (indices) primitive.setIndices(accessor("SCALAR", Uint32Array.from(indices)))
+    const material = out.createMaterial().setAlphaMode(p.getMaterial()?.getAlphaMode() ?? "OPAQUE")
+    const texture = p.getMaterial()?.getBaseColorTexture()
+    const image = texture?.getImage()
+    if (image) {
+      material.setBaseColorTexture(
+        out
+          .createTexture()
+          .setImage(image)
+          .setMimeType(texture?.getMimeType() || "image/png"),
+      )
+    }
+    haloMesh.addPrimitive(primitive.setMaterial(material))
+  }
+
+  const slug = key.toLowerCase().replace(/\W+/g, "-")
+  await mkdir("public/data/mesh", { recursive: true })
+  await writeFile(`public/data/mesh/${slug}.glb`, await io.writeBinary(out))
+  return {
+    file: `data/mesh/${slug}.glb`,
+    flat: fit.depth < MAX_FLAT_DEPTH && fit.overlap >= MIN_FLAT_OVERLAP,
+    models: [fitted.entry, ...costumes],
+  }
+}
+
+const withMeshes = []
+for (const entry of entries) withMeshes.push({ ...entry, mesh: await extractMesh(entry.key, entry.polygons) })
+
 const schools = Object.fromEntries(
   [...new Set(entries.flatMap((e) => (e.school ? [e.school] : [])))].map((id) => [
     id,
@@ -143,6 +252,9 @@ const haloless = [
   ),
 ]
 await mkdir("public/data", { recursive: true })
-await writeFile("public/data/halos.json", JSON.stringify({ schools, halos: entries }))
+await writeFile("public/data/halos.json", JSON.stringify({ schools, halos: withMeshes }))
 console.log(`halos: ${entries.length}, English only: ${unnamed.length} (${unnamed.map((e) => e.key).join(", ")})`)
 console.log(`SchaleDB students without halo: ${haloless.length} (${haloless.join(", ")})`)
+const noMesh = withMeshes.filter((e) => !e.mesh).map((e) => e.key)
+console.log(`meshes: ${withMeshes.length - noMesh.length}, without: ${noMesh.length} (${noMesh.join(", ")})`)
+console.log(`not flat: ${withMeshes.flatMap((e) => (e.mesh?.flat === false ? [e.key] : [])).join(", ")}`)

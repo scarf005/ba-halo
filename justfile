@@ -2,6 +2,10 @@
 data:
     pnpm data
 
+# Check extracted 3D halos against their outlines in .screenshots/sheet/sheet.svg
+sheet:
+    node scripts/halo-sheet.ts
+
 # Dev server
 dev:
     pnpm dev
