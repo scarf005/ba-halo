@@ -1,5 +1,7 @@
 # BA Halo
 
+![Hina's 3D halo posed on her character model](docs/screenshot.webp)
+
 Search Blue Archive halos by name, school, or club, filter them by school, rotate and move them in 3D, add a glow, and
 copy or save them as SVG or transparent PNG.
 Halos with a character model also have a textured 3D view. Load the model to pose the halo on the character.
