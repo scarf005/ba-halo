@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest"
 import {
+  DEFAULT_GLOW,
   type Halo,
   IDENTITY,
   matches,
@@ -189,6 +190,11 @@ describe("toSvg", () => {
       '<g fill="#000" filter="url(#glow)"><image href="data:image/png;base64,AA" x="-1.5" y="-1.5" width="5" height="4"/></g>',
     )
     expect(svg).not.toContain("<path")
+  })
+
+  test("default glow is visible", () => {
+    expect(DEFAULT_GLOW.radius).toBeGreaterThan(0)
+    expect(DEFAULT_GLOW.strength).toBeGreaterThan(0)
   })
 
   test("draws each polygon as its own even-odd path", () =>
