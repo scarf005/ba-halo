@@ -52,7 +52,7 @@ export type Transform = {
   perspective: number
 }
 
-export const DEFAULT_GLOW = { radius: 0.08, strength: 1.5 }
+export const DEFAULT_GLOW = { radius: 0.02, strength: 1.5 }
 
 export const IDENTITY: Transform = {
   rotateX: 0,
