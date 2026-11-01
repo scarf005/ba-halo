@@ -7,124 +7,148 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: ko\n"
 
-#: src/App.tsx:196
+#: src/App.tsx:320
 msgid "All"
 msgstr "전체"
 
-#: src/App.tsx:252
+#: src/App.tsx:451
 msgid "Color"
 msgstr "색상"
 
-#: src/App.tsx:130
+#: src/App.tsx:221
 msgid "Copied"
 msgstr "복사했습니다"
 
-#: src/App.tsx:131
+#: src/App.tsx:222
 msgid "Copy failed"
 msgstr "복사하지 못했습니다"
 
-#: src/App.tsx:296
+#: src/App.tsx:495
 msgid "Copy PNG"
 msgstr "PNG 복사"
 
-#: src/App.tsx:295
+#: src/App.tsx:494
 msgid "Copy SVG"
 msgstr "SVG 복사"
 
-#: src/App.tsx:298
+#: src/App.tsx:497
 msgid "Download PNG"
 msgstr "PNG 저장"
 
-#: src/App.tsx:297
+#: src/App.tsx:496
 msgid "Download SVG"
 msgstr "SVG 저장"
 
-#: src/App.tsx:273
+#: src/App.tsx:472
 msgid "Glow color"
 msgstr "발광 색상"
 
-#: src/App.tsx:257
+#: src/App.tsx:456
 msgid "Glow radius"
 msgstr "발광 범위"
 
-#: src/App.tsx:265
+#: src/App.tsx:464
 msgid "Glow strength"
 msgstr "발광 세기"
 
-#: src/App.tsx:191
+#: src/App.tsx:315
 msgid "Language"
 msgstr "언어"
 
 #: src/App.tsx:198
+msgid "Load failed"
+msgstr "불러오기 실패"
+
+#: src/App.tsx:422
+msgid "Model"
+msgstr "모델"
+
+#: src/App.tsx:322
 msgid "No school"
 msgstr "학교 없음"
 
-#: src/App.tsx:177
+#: src/App.tsx:424
+msgid "None"
+msgstr "없음"
+
+#: src/App.tsx:301
 msgid "Perspective"
 msgstr "원근"
 
-#: src/App.tsx:170
+#: src/App.tsx:430
+msgid "Pose"
+msgstr "자세"
+
+#: src/App.tsx:294
 msgid "Position X"
 msgstr "위치 X"
 
-#: src/App.tsx:171
+#: src/App.tsx:295
 msgid "Position Y"
 msgstr "위치 Y"
 
-#: src/App.tsx:172
+#: src/App.tsx:296
 msgid "Position Z"
 msgstr "위치 Z"
 
-#: src/App.tsx:254
-#: src/App.tsx:275
+#: src/App.tsx:453
+#: src/App.tsx:474
 msgid "Reset color"
 msgstr "색상 초기화"
 
-#: src/App.tsx:250
+#: src/App.tsx:409
 msgid "Reset transform"
 msgstr "변형 초기화"
 
-#: src/App.tsx:167
+#: src/App.tsx:432
+msgid "Rest pose"
+msgstr "기본 자세"
+
+#: src/App.tsx:291
 msgid "Rotate X"
 msgstr "회전 X"
 
-#: src/App.tsx:168
+#: src/App.tsx:292
 msgid "Rotate Y"
 msgstr "회전 Y"
 
-#: src/App.tsx:169
+#: src/App.tsx:293
 msgid "Rotate Z"
 msgstr "회전 Z"
 
-#: src/App.tsx:139
+#: src/App.tsx:230
 msgid "Save failed"
 msgstr "저장하지 못했습니다"
 
-#: src/App.tsx:173
+#: src/App.tsx:297
 msgid "Scale X"
 msgstr "크기 X"
 
-#: src/App.tsx:174
+#: src/App.tsx:298
 msgid "Scale Y"
 msgstr "크기 Y"
 
-#: src/App.tsx:186
-#: src/App.tsx:187
+#: src/App.tsx:310
+#: src/App.tsx:311
 msgid "Search"
 msgstr "검색"
 
-#: src/App.tsx:278
+#: src/App.tsx:477
 msgid "Size (px)"
 msgstr "크기 (px)"
 
-#: src/App.tsx:175
+#: src/App.tsx:299
 msgid "Skew X"
 msgstr "기울이기 X"
 
-#: src/App.tsx:176
+#: src/App.tsx:300
 msgid "Skew Y"
 msgstr "기울이기 Y"
 
-#: src/App.tsx:292
+#: src/App.tsx:438
+msgid "Time (s)"
+msgstr "시간 (초)"
+
+#: src/App.tsx:491
 msgid "Trim to halo"
 msgstr "헤일로에 맞춰 자르기"

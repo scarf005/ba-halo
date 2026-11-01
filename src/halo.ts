@@ -10,6 +10,27 @@ export type Halo = {
   tags: string[]
   /** Polygons of rings; each ring is a flat [x, y, x, y, ...] list with y pointing up. */
   polygons: number[][][]
+  mesh?: HaloMesh
+}
+
+/** 3D halo extracted from a character model; `file` holds it in halo units, loaded only when shown. */
+export type HaloMesh = {
+  file: string
+  /** Whether the 2D outline already shows this halo faithfully, so 2D is the default view. */
+  flat: boolean
+  /** The character's model, then its costumes that have a halo. */
+  models: HaloModel[]
+}
+
+/** A model file; its halo mesh maps to halo units by `unit * (basis * (scale * vertex) - center)`. */
+export type HaloModel = {
+  file: string
+  /** The halo node's rest scale, baked into the halo. */
+  scale: number[]
+  /** Row-major. */
+  basis: number[]
+  center: number[]
+  unit: number
 }
 
 export type HaloData = { schools: Record<string, Record<Locale, string>>; halos: Halo[] }
@@ -30,6 +51,8 @@ export type Transform = {
   /** Camera distance from the origin; 0 is orthographic. */
   perspective: number
 }
+
+export const DEFAULT_GLOW = { radius: 0, strength: 1.5 }
 
 export const IDENTITY: Transform = {
   rotateX: 0,
@@ -93,16 +116,40 @@ export const rotate = (t: Rotation, o: { axis: Axis; deg: number; frame: "local"
   return euler(o.frame === "local" ? mul(m, a) : mul(a, m))
 }
 
-/** Scale, skew, rotate Z/Y/X, then translate; returns a 3D point with y pointing up. */
+/** Scale, skew, rotate Z/Y/X, then translate; returns a 3D point with y pointing up. Depth scales by the mean scale. */
 const placer = (t: Transform) => {
   const m = rotation(t)
   const [kx, ky] = [Math.tan(rad(t.skewX)), Math.tan(rad(t.skewY))]
-  return (px: number, py: number): [number, number, number] => {
-    const [ax, ay] = [px * t.scaleX, py * t.scaleY]
+  const scaleZ = Math.sqrt(Math.abs(t.scaleX * t.scaleY))
+  return (px: number, py: number, pz = 0): [number, number, number] => {
+    const [ax, ay, az] = [px * t.scaleX, py * t.scaleY, pz * scaleZ]
     const [bx, by] = [ax + kx * ay, ay + ky * ax]
-    return [m[0] * bx + m[1] * by + t.x, m[3] * bx + m[4] * by + t.y, m[6] * bx + m[7] * by + t.z]
+    return [
+      m[0] * bx + m[1] * by + m[2] * az + t.x,
+      m[3] * bx + m[4] * by + m[5] * az + t.y,
+      m[6] * bx + m[7] * by + m[8] * az + t.z,
+    ]
   }
 }
+
+/** The placement as a column-major 4x4 matrix. */
+export const placement = (t: Transform) => {
+  const place = placer(t)
+  const columns = [place(1, 0, 0), place(0, 1, 0), place(0, 0, 1)].map(([x, y, z]) => [x - t.x, y - t.y, z - t.z, 0])
+  return [...columns.flat(), t.x, t.y, t.z, 1]
+}
+
+/**
+ * The transform after the halo moved by a rigid `turn` and `shift` within its own frame, as when the character wearing
+ * it changes pose; `turn` is row-major. Scale and skew stay.
+ */
+export const repose = (t: Transform, o: { turn: Mat3; shift: number[] }): Transform => {
+  const [x, y, z] = placer(t)(o.shift[0], o.shift[1], o.shift[2])
+  return { ...t, ...euler(mul(rotation(t), o.turn)), x, y, z }
+}
+
+/** Euler angles of a row-major rotation matrix. */
+export const anglesOf = euler
 
 /** Points must stay this far in front of the camera, which limits perspective magnification to perspective / NEAR. */
 const NEAR = 0.05
@@ -131,6 +178,17 @@ const clipNear = (ring: number[][], limit: number) => {
     }
   })
   return out
+}
+
+/** Screen points of 3D vertices, as one flat ring; vertices behind the camera plane are dropped. */
+export const projectPoints = (vertices: ArrayLike<number>, t: Transform) => {
+  const place = placer(t)
+  const points: number[] = []
+  for (let i = 0; i < vertices.length; i += 3) {
+    const p = place(vertices[i], vertices[i + 1], vertices[i + 2])
+    if (visible(t, p)) points.push(...toScreen(t, p))
+  }
+  return points
 }
 
 export const project = (polygons: number[][][], t: Transform) => {
@@ -226,8 +284,8 @@ const grow = (b: Box, by: number): Box => ({
 })
 
 /** Blurred copy of the halo's alpha, tinted with the glow color and amplified by `strength`, drawn under the halo. */
-const glowFilter = (g: Glow, box: Box) =>
-  `<filter id="glow" filterUnits="userSpaceOnUse" x="${num(box.x)}" y="${num(box.y)}" width="${num(box.width)}" height="${num(box.height)}">` +
+export const glowFilter = (g: Glow, box: Box, id = "glow") =>
+  `<filter id="${id}" filterUnits="userSpaceOnUse" x="${num(box.x)}" y="${num(box.y)}" width="${num(box.width)}" height="${num(box.height)}">` +
   `<feGaussianBlur in="SourceAlpha" stdDeviation="${num(g.radius)}" result="blur"/>` +
   `<feFlood flood-color="${g.color}"/><feComposite in2="blur" operator="in"/>` +
   `<feComponentTransfer><feFuncA type="linear" slope="${num(g.strength)}"/></feComponentTransfer>` +
@@ -235,15 +293,24 @@ const glowFilter = (g: Glow, box: Box) =>
 
 /**
  * Standalone SVG whose longest side is `size` pixels; `box` defaults to the projected halo's bounds, grown to fit the
- * glow.
+ * glow. `image` replaces the paths with a raster of the box at the output size, for textured 3D halos.
  */
-export const toSvg = (o: { polygons: number[][][]; color: string; size: number; box?: Box; glow?: Glow }) => {
+export const toSvg = (o: {
+  polygons: number[][][]
+  color: string
+  size: number
+  box?: Box
+  glow?: Glow
+  image?: (o: { box: Box; width: number; height: number }) => string
+}) => {
   const glow = o.glow && o.glow.radius > 0 && o.glow.strength > 0 ? o.glow : undefined
   const box = o.box ?? grow(bounds(o.polygons), glow ? glow.radius * 3 : 0)
   const scale = o.size / Math.max(box.width, box.height)
   const [w, h] = [Math.max(1, Math.round(box.width * scale)), Math.max(1, Math.round(box.height * scale))]
-  const paths = o.polygons.map((rings) => `<path fill-rule="evenodd" d="${pathData(rings)}"/>`).join("")
   const viewBox = [box.x, box.y, box.width, box.height].map(num).join(" ")
+  const paths = o.image
+    ? `<image href="${o.image({ box, width: w, height: h })}" x="${num(box.x)}" y="${num(box.y)}" width="${num(box.width)}" height="${num(box.height)}"/>`
+    : o.polygons.map((rings) => `<path fill-rule="evenodd" d="${pathData(rings)}"/>`).join("")
   const [defs, filter] = glow ? [`<defs>${glowFilter(glow, box)}</defs>`, ' filter="url(#glow)"'] : ["", ""]
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${viewBox}">${defs}<g fill="${o.color}"${filter}>${paths}</g></svg>`
 }

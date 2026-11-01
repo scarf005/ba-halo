@@ -7,124 +7,148 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: ja\n"
 
-#: src/App.tsx:196
+#: src/App.tsx:320
 msgid "All"
 msgstr "すべて"
 
-#: src/App.tsx:252
+#: src/App.tsx:451
 msgid "Color"
 msgstr "色"
 
-#: src/App.tsx:130
+#: src/App.tsx:221
 msgid "Copied"
 msgstr "コピーしました"
 
-#: src/App.tsx:131
+#: src/App.tsx:222
 msgid "Copy failed"
 msgstr "コピーに失敗しました"
 
-#: src/App.tsx:296
+#: src/App.tsx:495
 msgid "Copy PNG"
 msgstr "PNGをコピー"
 
-#: src/App.tsx:295
+#: src/App.tsx:494
 msgid "Copy SVG"
 msgstr "SVGをコピー"
 
-#: src/App.tsx:298
+#: src/App.tsx:497
 msgid "Download PNG"
 msgstr "PNGを保存"
 
-#: src/App.tsx:297
+#: src/App.tsx:496
 msgid "Download SVG"
 msgstr "SVGを保存"
 
-#: src/App.tsx:273
+#: src/App.tsx:472
 msgid "Glow color"
 msgstr "発光の色"
 
-#: src/App.tsx:257
+#: src/App.tsx:456
 msgid "Glow radius"
 msgstr "発光の広さ"
 
-#: src/App.tsx:265
+#: src/App.tsx:464
 msgid "Glow strength"
 msgstr "発光の強さ"
 
-#: src/App.tsx:191
+#: src/App.tsx:315
 msgid "Language"
 msgstr "言語"
 
 #: src/App.tsx:198
+msgid "Load failed"
+msgstr "読み込み失敗"
+
+#: src/App.tsx:422
+msgid "Model"
+msgstr "モデル"
+
+#: src/App.tsx:322
 msgid "No school"
 msgstr "学園なし"
 
-#: src/App.tsx:177
+#: src/App.tsx:424
+msgid "None"
+msgstr "なし"
+
+#: src/App.tsx:301
 msgid "Perspective"
 msgstr "遠近"
 
-#: src/App.tsx:170
+#: src/App.tsx:430
+msgid "Pose"
+msgstr "ポーズ"
+
+#: src/App.tsx:294
 msgid "Position X"
 msgstr "位置 X"
 
-#: src/App.tsx:171
+#: src/App.tsx:295
 msgid "Position Y"
 msgstr "位置 Y"
 
-#: src/App.tsx:172
+#: src/App.tsx:296
 msgid "Position Z"
 msgstr "位置 Z"
 
-#: src/App.tsx:254
-#: src/App.tsx:275
+#: src/App.tsx:453
+#: src/App.tsx:474
 msgid "Reset color"
 msgstr "色をリセット"
 
-#: src/App.tsx:250
+#: src/App.tsx:409
 msgid "Reset transform"
 msgstr "変形をリセット"
 
-#: src/App.tsx:167
+#: src/App.tsx:432
+msgid "Rest pose"
+msgstr "基本ポーズ"
+
+#: src/App.tsx:291
 msgid "Rotate X"
 msgstr "回転 X"
 
-#: src/App.tsx:168
+#: src/App.tsx:292
 msgid "Rotate Y"
 msgstr "回転 Y"
 
-#: src/App.tsx:169
+#: src/App.tsx:293
 msgid "Rotate Z"
 msgstr "回転 Z"
 
-#: src/App.tsx:139
+#: src/App.tsx:230
 msgid "Save failed"
 msgstr "保存に失敗しました"
 
-#: src/App.tsx:173
+#: src/App.tsx:297
 msgid "Scale X"
 msgstr "拡大 X"
 
-#: src/App.tsx:174
+#: src/App.tsx:298
 msgid "Scale Y"
 msgstr "拡大 Y"
 
-#: src/App.tsx:186
-#: src/App.tsx:187
+#: src/App.tsx:310
+#: src/App.tsx:311
 msgid "Search"
 msgstr "検索"
 
-#: src/App.tsx:278
+#: src/App.tsx:477
 msgid "Size (px)"
 msgstr "サイズ (px)"
 
-#: src/App.tsx:175
+#: src/App.tsx:299
 msgid "Skew X"
 msgstr "傾斜 X"
 
-#: src/App.tsx:176
+#: src/App.tsx:300
 msgid "Skew Y"
 msgstr "傾斜 Y"
 
-#: src/App.tsx:292
+#: src/App.tsx:438
+msgid "Time (s)"
+msgstr "時間 (秒)"
+
+#: src/App.tsx:491
 msgid "Trim to halo"
 msgstr "ヘイローに合わせて切り抜く"

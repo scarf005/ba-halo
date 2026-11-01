@@ -1,11 +1,14 @@
 import { useLingui } from "@lingui/solid/macro"
-import { createMemo, createResource, createSignal, For, Show } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import {
   type Axis,
+  anglesOf,
   bounds,
+  DEFAULT_GLOW,
   FRAME,
   type Glow,
+  glowFilter,
   type Halo,
   type HaloData,
   IDENTITY,
@@ -13,6 +16,8 @@ import {
   matches,
   pathData,
   project,
+  projectPoints,
+  repose,
   ringPath,
   ringTurn,
   rotate,
@@ -20,6 +25,7 @@ import {
   toSvg,
 } from "./halo"
 import { activate, LOCALES } from "./i18n"
+import type { createHaloView, createModelView } from "./scene"
 
 /** Full name, plus the costume name when the halo belongs to a costume such as Shiroko*Terror. */
 const bare = (s: string) => s.replace(/\s/g, "")
@@ -106,23 +112,115 @@ export const App = () => {
   const [selected, setSelected] = createSignal<Halo>()
   const [transform, setTransform] = createStore<Transform>({ ...IDENTITY, perspective: 8 })
   const [color, setColor] = createSignal<string>()
-  const [glow, setGlow] = createStore<Omit<Glow, "color"> & { color?: string }>({ radius: 0, strength: 1.5 })
+  const [glow, setGlow] = createStore<Omit<Glow, "color"> & { color?: string }>({ ...DEFAULT_GLOW })
   const [size, setSize] = createSignal(1024)
   const [trim, setTrim] = createSignal(true)
   const [status, setStatus] = createSignal("")
+  /** The user's choice of view for the current halo; undefined uses the halo's default. */
+  const [view, setView] = createSignal<"2d" | "3d">()
+  const [modelFile, setModelFile] = createSignal<string>()
+  /** Index into the model's animations; names can repeat. */
+  const [clip, setClip] = createSignal<number>()
+  const [clipTime, setClipTime] = createSignal(0)
+  const [stageSize, setStageSize] = createSignal(1000)
 
   const filtered = createMemo(() =>
     (data()?.halos ?? []).filter((h) => (school() === undefined || h.school === school()) && matches(h, query())),
   )
   const current = () => selected() ?? filtered()[0]
   const fill = () => color() ?? current()?.color ?? "#000"
+  const heading = () => {
+    const halo = current()
+    return halo && title(halo.names[locale()])
+  }
+
+  let haloCanvas!: HTMLCanvasElement
+  let modelCanvas!: HTMLCanvasElement
+  let haloView: ReturnType<typeof createHaloView> | undefined
+  let modelView: ReturnType<typeof createModelView> | undefined
+
+  const wants3d = () => {
+    const mesh = current()?.mesh
+    return !!mesh && (view() ?? (mesh.flat ? "2d" : "3d")) === "3d"
+  }
+  /** Three.js and the mesh load only when a halo is first shown in 3D; 2D stays on screen until then. */
+  const [vertices] = createResource(
+    () => (wants3d() ? current()?.mesh?.file : undefined),
+    async (file) => {
+      const { createHaloView } = await import("./scene")
+      haloView ??= createHaloView(haloCanvas)
+      return haloView.load(`./${file}`)
+    },
+  )
+  const shown3d = () => wants3d() && !vertices.loading && !vertices.error && !!vertices()
+  /** The texture's own colors unless the user picked a color, which tints them; untextured halos use the fill. */
+  const colors = () => ({ textured: color() ?? "#fff", plain: fill() })
+  createEffect(() => {
+    if (shown3d()) haloView?.draw({ ...transform }, colors())
+  })
+
   const projected = createMemo(() => {
     const halo = current()
-    return halo ? project(halo.polygons, { ...transform }) : []
+    if (!halo) return []
+    return shown3d() ? [[projectPoints(vertices() ?? [], { ...transform })]] : project(halo.polygons, { ...transform })
   })
   const glowSpec = (): Glow => ({ ...glow, color: glow.color ?? fill() })
+  const glowing = () => glow.radius > 0 && glow.strength > 0
   const svg = () =>
-    toSvg({ polygons: projected(), color: fill(), size: size(), box: trim() ? undefined : FRAME, glow: glowSpec() })
+    toSvg({
+      polygons: projected(),
+      color: fill(),
+      size: size(),
+      box: trim() ? undefined : FRAME,
+      glow: glowSpec(),
+      image: shown3d() ? (o) => haloView?.capture({ ...o, t: { ...transform }, colors: colors() }) ?? "" : undefined,
+    })
+  /** The same glow on the live canvas, whose filter works in CSS pixels. */
+  const canvasGlow = () => {
+    const pixels = stageSize() / FRAME.width
+    const box = { x: 0, y: 0, width: 1e4, height: 1e4 }
+    return `<defs>${glowFilter({ ...glowSpec(), radius: glow.radius * pixels }, box, "canvas-glow")}</defs>`
+  }
+
+  const [model] = createResource(modelFile, async (file) => {
+    const fit = current()?.mesh?.models.find((m) => m.file === file)
+    if (!fit) return
+    const { createModelView } = await import("./scene")
+    modelView ??= createModelView(modelCanvas)
+    const loaded = await modelView.load(fit)
+    if (!loaded) return
+    if (modelFile() !== file) {
+      modelView.clear()
+      return
+    }
+    const { animations, turn, scale, position } = loaded
+    const [x, y, z] = position
+    setClip()
+    setClipTime(0)
+    setTransform({ ...anglesOf(turn), scaleX: scale, scaleY: scale, x, y, z })
+    return animations
+  })
+  const modelShown = () => !!modelFile() && !model.loading && !model.error && !!model()
+  createEffect(() => {
+    if (modelShown()) modelView?.draw({ ...transform })
+    else modelView?.clear()
+  })
+  createEffect(() => {
+    if (model.error || vertices.error) flash(t`Load failed`)
+  })
+  const clipDuration = () => model()?.[clip() ?? -1]?.duration ?? 0
+  /** The body stays on screen while the halo follows the head to the new pose. */
+  const setPose = (index: number | undefined, time: number) => {
+    setClip(index)
+    setClipTime(time)
+    if (modelView) setTransform(repose({ ...transform }, modelView.pose(index, time)))
+  }
+  createEffect(
+    on(current, () => {
+      setView()
+      setModelFile()
+    }),
+  )
   const fileName = () => `halo-${current()?.key.toLowerCase().replace(/\W+/g, "-")}`
 
   const flash = (message: string) => {
@@ -158,6 +256,11 @@ export const App = () => {
   })
   const AXES: Axis[] = [0, 1, 2]
   let gizmo!: SVGSVGElement
+  const observeStage = (stage: HTMLDivElement) => {
+    const observer = new ResizeObserver(() => setStageSize(Math.min(stage.clientWidth, stage.clientHeight)))
+    observer.observe(stage)
+    onCleanup(() => observer.disconnect())
+  }
   const toFrame = (e: PointerEvent) => {
     const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(gizmo.getScreenCTM()?.inverse())
     return [p.x, p.y]
@@ -251,45 +354,54 @@ export const App = () => {
         </ul>
       </aside>
       <main class="editor">
-        <Show when={current()}>
-          {(halo) => (
-            <>
-              <h1>{title(halo().names[locale()])}</h1>
-              <div
-                class="preview"
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={endDrag}
-                onPointerCancel={endDrag}
-                role="img"
-                aria-label={halo().names[locale()].full}
-              >
-                <div
-                  class="art"
-                  innerHTML={toSvg({ polygons: projected(), color: fill(), size: 1000, box: FRAME, glow: glowSpec() })}
-                />
-                <svg
-                  ref={gizmo}
-                  class="gizmo"
-                  viewBox={[FRAME.x, FRAME.y, FRAME.width, FRAME.height].join(" ")}
-                  aria-hidden="true"
-                >
-                  <For each={AXES}>
-                    {(axis) => {
-                      const d = createMemo(() => ringPath({ ...transform }, axis, ringRadius()))
-                      return (
-                        <g data-axis={axis}>
-                          <path d={d()} />
-                          <path class="ring-hit" d={d()} />
-                        </g>
-                      )
-                    }}
-                  </For>
-                </svg>
-              </div>
-            </>
-          )}
-        </Show>
+        <h1>{heading()}</h1>
+        {/* Stays mounted, because the WebGL views stay bound to its canvases. */}
+        <div
+          ref={observeStage}
+          class="preview"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          role="img"
+          aria-label={current()?.names[locale()].full}
+        >
+          <svg class="filters" aria-hidden="true" innerHTML={canvasGlow()} />
+          <canvas ref={haloCanvas} hidden={!shown3d()} style={{ filter: glowing() ? "url(#canvas-glow)" : "none" }} />
+          <Show when={current() && !shown3d()}>
+            <div
+              class="art"
+              innerHTML={toSvg({
+                polygons: projected(),
+                color: fill(),
+                size: 1000,
+                box: FRAME,
+                glow: glowSpec(),
+              })}
+            />
+          </Show>
+          <canvas ref={modelCanvas} hidden={!modelShown()} />
+          <Show when={current()}>
+            <svg
+              ref={gizmo}
+              class="gizmo"
+              viewBox={[FRAME.x, FRAME.y, FRAME.width, FRAME.height].join(" ")}
+              aria-hidden="true"
+            >
+              <For each={AXES}>
+                {(axis) => {
+                  const d = createMemo(() => ringPath({ ...transform }, axis, ringRadius()))
+                  return (
+                    <g data-axis={axis}>
+                      <path d={d()} />
+                      <path class="ring-hit" d={d()} />
+                    </g>
+                  )
+                }}
+              </For>
+            </svg>
+          </Show>
+        </div>
       </main>
       <section class="controls">
         <For each={sliders()}>
@@ -299,6 +411,54 @@ export const App = () => {
           type="button"
           onClick={() => setTransform({ ...IDENTITY, perspective: 8 })}
         >{t`Reset transform`}</button>
+        <Show when={current()?.mesh}>
+          {(mesh) => (
+            <>
+              <div class="actions">
+                <button type="button" aria-pressed={!wants3d()} onClick={() => setView("2d")}>
+                  2D
+                </button>
+                <button type="button" aria-pressed={wants3d()} onClick={() => setView("3d")}>
+                  3D
+                </button>
+              </div>
+              <label class="slider">
+                <span>{t`Model`}</span>
+                <select value={modelFile() ?? ""} onChange={(e) => setModelFile(e.currentTarget.value || undefined)}>
+                  <option value="">{t`None`}</option>
+                  <For each={mesh().models}>
+                    {({ file }) => <option value={file}>{file.replace(/\.glb$/, "")}</option>}
+                  </For>
+                </select>
+              </label>
+              <Show when={modelShown()}>
+                <label class="slider">
+                  <span>{t`Pose`}</span>
+                  <select
+                    value={clip() ?? ""}
+                    onChange={(e) => {
+                      const { value } = e.currentTarget
+                      setPose(value === "" ? undefined : Number(value), 0)
+                    }}
+                  >
+                    <option value="">{t`Rest pose`}</option>
+                    <For each={model()}>{(a, i) => <option value={i()}>{a.name}</option>}</For>
+                  </select>
+                </label>
+                <Show when={clip() !== undefined}>
+                  <Slider
+                    label={t`Time (s)`}
+                    min={0}
+                    max={clipDuration()}
+                    step={0.01}
+                    value={clipTime()}
+                    onInput={(v) => setPose(clip(), v)}
+                  />
+                </Show>
+              </Show>
+            </>
+          )}
+        </Show>
         <label class="slider">
           <span>{t`Color`}</span>
           <input type="color" value={fill()} onInput={(e) => setColor(e.currentTarget.value)} />

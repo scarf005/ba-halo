@@ -1,5 +1,17 @@
 import { describe, expect, test } from "vitest"
-import { type Halo, IDENTITY, matches, project, projector, ringTurn, rotate, toSvg } from "./halo"
+import {
+  type Halo,
+  IDENTITY,
+  matches,
+  placement,
+  project,
+  projector,
+  projectPoints,
+  repose,
+  ringTurn,
+  rotate,
+  toSvg,
+} from "./halo"
 
 const close = ([x, y]: [number, number], [ex, ey]: [number, number]) => {
   expect(x).toBeCloseTo(ex)
@@ -23,6 +35,64 @@ describe("projector", () => {
   })
 
   test("orthographic mode ignores depth", () => close(projector({ ...IDENTITY, z: 3 })(1, 1), [1, -1]))
+})
+
+describe("placement", () => {
+  const apply = (m: number[], [x, y, z]: number[]) =>
+    [0, 1, 2].map((r) => m[r] * x + m[4 + r] * y + m[8 + r] * z + m[12 + r])
+
+  test("matches the point placement used for projection", () => {
+    const t = {
+      ...IDENTITY,
+      rotateX: 30,
+      rotateY: -50,
+      rotateZ: 20,
+      x: 1,
+      y: -2,
+      z: 0.5,
+      scaleX: 2,
+      scaleY: 0.5,
+      skewX: 10,
+    }
+    const [x, y] = projectPoints([0.3, -0.7, 0.4], t)
+    const placed = apply(placement(t), [0.3, -0.7, 0.4])
+    expect(placed[0]).toBeCloseTo(x)
+    expect(placed[1]).toBeCloseTo(-y)
+  })
+
+  test("uniform scale scales depth equally", () => {
+    const [, , z] = apply(placement({ ...IDENTITY, scaleX: 2, scaleY: 2 }), [0, 0, 1])
+    expect(z).toBeCloseTo(2)
+  })
+
+  test("depth turns into width when rotated edge-on", () =>
+    close(projectPoints([0, 0, 1], { ...IDENTITY, rotateY: 90 }) as [number, number], [1, 0]))
+})
+
+describe("projectPoints", () => {
+  test("drops vertices behind the camera plane", () => {
+    const points = projectPoints([0, 0, 0, 0, 0, 9], { ...IDENTITY, perspective: 5 })
+    expect(points).toEqual([0, -0])
+  })
+})
+
+describe("repose", () => {
+  const yaw90 = [0, 0, 1, 0, 1, 0, -1, 0, 0]
+
+  test("composes the pose's turn after the current rotation", () => {
+    const turned = repose(IDENTITY, { turn: yaw90, shift: [0, 0, 0] })
+    expect(turned.rotateY).toBeCloseTo(90)
+    close(projector(turned)(1, 0), [0, -0])
+  })
+
+  test("moves the origin along the halo's own scaled axes", () => {
+    const moved = repose(
+      { ...IDENTITY, rotateZ: 90, scaleX: 2, x: 1 },
+      { turn: [1, 0, 0, 0, 1, 0, 0, 0, 1], shift: [1, 0, 0] },
+    )
+    expect([moved.x, moved.y, moved.z]).toEqual([expect.closeTo(1), expect.closeTo(2), expect.closeTo(0)])
+    expect(moved.scaleX).toBe(2)
+  })
 })
 
 describe("rotate", () => {
@@ -100,6 +170,25 @@ describe("toSvg", () => {
     expect(svg).toContain('flood-color="#0ff"')
     expect(svg).toContain('slope="2"')
     expect(svg).toContain('<g fill="#000" filter="url(#glow)">')
+  })
+
+  test("a raster image replaces the paths, gets the output size and keeps the glow", () => {
+    const sizes: unknown[] = []
+    const svg = toSvg({
+      polygons: square,
+      color: "#000",
+      size: 100,
+      glow: { radius: 0.5, strength: 1, color: "#fff" },
+      image: (o) => {
+        sizes.push([o.width, o.height, o.box])
+        return "data:image/png;base64,AA"
+      },
+    })
+    expect(sizes).toEqual([[100, 80, { x: -1.5, y: -1.5, width: 5, height: 4 }]])
+    expect(svg).toContain(
+      '<g fill="#000" filter="url(#glow)"><image href="data:image/png;base64,AA" x="-1.5" y="-1.5" width="5" height="4"/></g>',
+    )
+    expect(svg).not.toContain("<path")
   })
 
   test("draws each polygon as its own even-odd path", () =>

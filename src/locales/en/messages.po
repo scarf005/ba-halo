@@ -7,124 +7,148 @@ msgstr ""
 "X-Generator: @lingui/cli\n"
 "Language: en\n"
 
-#: src/App.tsx:196
+#: src/App.tsx:320
 msgid "All"
 msgstr "All"
 
-#: src/App.tsx:252
+#: src/App.tsx:451
 msgid "Color"
 msgstr "Color"
 
-#: src/App.tsx:130
+#: src/App.tsx:221
 msgid "Copied"
 msgstr "Copied"
 
-#: src/App.tsx:131
+#: src/App.tsx:222
 msgid "Copy failed"
 msgstr "Copy failed"
 
-#: src/App.tsx:296
+#: src/App.tsx:495
 msgid "Copy PNG"
 msgstr "Copy PNG"
 
-#: src/App.tsx:295
+#: src/App.tsx:494
 msgid "Copy SVG"
 msgstr "Copy SVG"
 
-#: src/App.tsx:298
+#: src/App.tsx:497
 msgid "Download PNG"
 msgstr "Download PNG"
 
-#: src/App.tsx:297
+#: src/App.tsx:496
 msgid "Download SVG"
 msgstr "Download SVG"
 
-#: src/App.tsx:273
+#: src/App.tsx:472
 msgid "Glow color"
 msgstr "Glow color"
 
-#: src/App.tsx:257
+#: src/App.tsx:456
 msgid "Glow radius"
 msgstr "Glow radius"
 
-#: src/App.tsx:265
+#: src/App.tsx:464
 msgid "Glow strength"
 msgstr "Glow strength"
 
-#: src/App.tsx:191
+#: src/App.tsx:315
 msgid "Language"
 msgstr "Language"
 
 #: src/App.tsx:198
+msgid "Load failed"
+msgstr "Load failed"
+
+#: src/App.tsx:422
+msgid "Model"
+msgstr "Model"
+
+#: src/App.tsx:322
 msgid "No school"
 msgstr "No school"
 
-#: src/App.tsx:177
+#: src/App.tsx:424
+msgid "None"
+msgstr "None"
+
+#: src/App.tsx:301
 msgid "Perspective"
 msgstr "Perspective"
 
-#: src/App.tsx:170
+#: src/App.tsx:430
+msgid "Pose"
+msgstr "Pose"
+
+#: src/App.tsx:294
 msgid "Position X"
 msgstr "Position X"
 
-#: src/App.tsx:171
+#: src/App.tsx:295
 msgid "Position Y"
 msgstr "Position Y"
 
-#: src/App.tsx:172
+#: src/App.tsx:296
 msgid "Position Z"
 msgstr "Position Z"
 
-#: src/App.tsx:254
-#: src/App.tsx:275
+#: src/App.tsx:453
+#: src/App.tsx:474
 msgid "Reset color"
 msgstr "Reset color"
 
-#: src/App.tsx:250
+#: src/App.tsx:409
 msgid "Reset transform"
 msgstr "Reset transform"
 
-#: src/App.tsx:167
+#: src/App.tsx:432
+msgid "Rest pose"
+msgstr "Rest pose"
+
+#: src/App.tsx:291
 msgid "Rotate X"
 msgstr "Rotate X"
 
-#: src/App.tsx:168
+#: src/App.tsx:292
 msgid "Rotate Y"
 msgstr "Rotate Y"
 
-#: src/App.tsx:169
+#: src/App.tsx:293
 msgid "Rotate Z"
 msgstr "Rotate Z"
 
-#: src/App.tsx:139
+#: src/App.tsx:230
 msgid "Save failed"
 msgstr "Save failed"
 
-#: src/App.tsx:173
+#: src/App.tsx:297
 msgid "Scale X"
 msgstr "Scale X"
 
-#: src/App.tsx:174
+#: src/App.tsx:298
 msgid "Scale Y"
 msgstr "Scale Y"
 
-#: src/App.tsx:186
-#: src/App.tsx:187
+#: src/App.tsx:310
+#: src/App.tsx:311
 msgid "Search"
 msgstr "Search"
 
-#: src/App.tsx:278
+#: src/App.tsx:477
 msgid "Size (px)"
 msgstr "Size (px)"
 
-#: src/App.tsx:175
+#: src/App.tsx:299
 msgid "Skew X"
 msgstr "Skew X"
 
-#: src/App.tsx:176
+#: src/App.tsx:300
 msgid "Skew Y"
 msgstr "Skew Y"
 
-#: src/App.tsx:292
+#: src/App.tsx:438
+msgid "Time (s)"
+msgstr "Time (s)"
+
+#: src/App.tsx:491
 msgid "Trim to halo"
 msgstr "Trim to halo"
