@@ -29,6 +29,7 @@
     "@types/three": "^0.187.0",
     "@types/wellknown": "^0.5.8",
     "ml-matrix": "^6.15.1",
+    "sharp": "^0.35.5",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vite-plugin-solid": "^2.11.15",
